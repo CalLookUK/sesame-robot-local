@@ -325,7 +325,7 @@ const FACE_FPS = { idle_blink:7, dead:2 };
 const STAND  = {R1:135,R2:45,L1:45,L2:135,R4:0,R3:180,L3:0,L4:180};
 const REST   = {R1:90,R2:90,L1:90,L2:90,R4:90,R3:90,L3:90,L4:90};
 const FD = 100;
-const WD = 180; // walk step delay — gives clear trot cadence at ~1.4 Hz
+const WD = 100; // walk step delay — matches firmware frameDelay default (100 ms → 1.67 Hz trot)
 
 const ANIMATIONS = {
   rest:  [{ face:'rest', mode:'boomerang', servos:REST, delay:0 }],
@@ -1150,7 +1150,7 @@ const speedSlider = document.getElementById('speed-slider');
 const speedVal    = document.getElementById('speed-val');
 speedSlider.addEventListener('input', () => {
   state.speed = speedSlider.value / 100;
-  state.gait.speed = 1.2 * state.speed;  // scale trot frequency with speed slider
+  state.gait.speed = 1.67 * state.speed;  // scale trot frequency with speed slider — matches firmware ~1.67 Hz
   speedVal.textContent = state.speed.toFixed(2).replace(/\.?0+$/,'') + '×';
 });
 
