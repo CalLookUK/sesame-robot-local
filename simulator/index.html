@@ -719,39 +719,30 @@ function drawRobot() {
     }
   });
 
-  // ── draw BACK legs (BR index=2, BL index=3) — behind body ───────────────
+  // ── all legs (back behind body, front in front) ──────────────────────────
   [3, 2].forEach(i => _drawLeg(legs[i], LEGS[i].name, true));
 
-  // ── body box ─────────────────────────────────────────────────────────────
+  // ── body box wireframe ────────────────────────────────────────────────────
   const {cx, cy, cz, w, d, h} = BDY;
-  // 8 corners
   const C = [
     iso(cx-w/2, cy-d/2, cz-h/2), iso(cx+w/2, cy-d/2, cz-h/2),  // 0,1 bottom-front
     iso(cx+w/2, cy+d/2, cz-h/2), iso(cx-w/2, cy+d/2, cz-h/2),  // 2,3 bottom-back
     iso(cx-w/2, cy-d/2, cz+h/2), iso(cx+w/2, cy-d/2, cz+h/2),  // 4,5 top-front
     iso(cx+w/2, cy+d/2, cz+h/2), iso(cx-w/2, cy+d/2, cz+h/2),  // 6,7 top-back
   ];
+  const EDGES = [[0,1],[1,2],[2,3],[3,0],[4,5],[5,6],[6,7],[7,4],[0,4],[1,5],[2,6],[3,7]];
+  EDGES.forEach(([a,b]) => line(C[a], C[b], '#ff8c42', 1));
 
-  // Right side face (x+): corners 1,2,6,5  — medium shade
-  poly([C[1],C[2],C[6],C[5]], '#b35a18', '#8a4010', 1);
-  // Front face (y-): corners 0,1,5,4  — medium-light shade
-  poly([C[0],C[1],C[5],C[4]], '#d06820', '#a04c10', 1);
-  // Top face (z+): corners 4,5,6,7  — brightest
-  poly([C[4],C[5],C[6],C[7]], '#ff8c42', '#cc6020', 1.5);
-
-  // Body labels
-  RCTX.font = 'bold 9px monospace';
+  // "FRONT" / "BACK" labels
+  RCTX.font = 'bold 8px monospace';
   RCTX.textAlign = 'center';
-  // "FRONT" on front face
-  const frontMid = iso(cx, cy-d/2, cz+2);
-  RCTX.fillStyle = 'rgba(20,10,0,0.7)';
-  RCTX.fillText('▲ FRONT', frontMid[0], frontMid[1]+3);
-  // "BACK" on top face back edge
-  const backMid  = iso(cx, cy+d/2, cz+h/2+1);
-  RCTX.fillStyle = 'rgba(20,10,0,0.55)';
-  RCTX.fillText('▼ BACK', backMid[0], backMid[1]+2);
+  const frontMid = iso(cx, cy-d/2, cz);
+  RCTX.fillStyle = 'rgba(255,140,66,0.6)';
+  RCTX.fillText('FRONT', frontMid[0], frontMid[1]+3);
+  const backMid  = iso(cx, cy+d/2, cz);
+  RCTX.fillStyle = 'rgba(255,140,66,0.35)';
+  RCTX.fillText('BACK', backMid[0], backMid[1]+3);
 
-  // ── draw FRONT legs (FL index=1, FR index=0) — in front of body ──────────
   [1, 0].forEach(i => _drawLeg(legs[i], LEGS[i].name, false));
 
   // ── axes legend (small, bottom-right corner) ─────────────────────────────
@@ -763,48 +754,28 @@ function _drawLeg(leg, name, isBack) {
   const knee = iso(...leg.knee);
   const foot = iso(...leg.foot);
 
-  const alpha = isBack ? 0.72 : 1.0;
+  const alpha = isBack ? 0.5 : 1.0;
+  const col   = isBack ? '#cc7030' : '#ff8c42';
   RCTX.globalAlpha = alpha;
 
-  // Upper segment shadow
-  RCTX.globalAlpha = alpha * 0.25;
-  line(hip, knee, '#000', 9);
-  RCTX.globalAlpha = alpha;
+  line(hip, knee, col, 1);
+  line(knee, foot, col, 1);
 
-  // Upper segment
-  line(hip, knee, '#b8b8cc', 6.5);
-  // Specular highlight
-  RCTX.globalAlpha = alpha * 0.4;
-  line(hip, knee, '#ddddf0', 2);
-  RCTX.globalAlpha = alpha;
-
-  // Lower segment shadow
-  RCTX.globalAlpha = alpha * 0.2;
-  line(knee, foot, '#000', 7);
-  RCTX.globalAlpha = alpha;
-
-  // Lower segment
-  line(knee, foot, '#7878a0', 5);
-
-  // Hip joint (body attachment)
-  circle(hip, 7, '#ff8c42', '#cc5010', 1.5);
-  // Knee joint
-  circle(knee, 4.5, '#dd6820', '#aa4010', 1.2);
-  // Foot
+  // Joint dots
+  circle(hip,  2.5, col);
+  circle(knee, 2,   col);
   if (leg.grounded) {
-    circle(foot, 5, '#ff8c42', '#ffaa60', 1.5);
+    circle(foot, 3, null, col, 1);
   } else {
-    circle(foot, 3.5, '#50506a', '#707090', 1);
+    circle(foot, 2, col);
   }
 
-  // Leg name tag near foot
-  const [fx, fy, fz] = leg.foot;
-  const tagOffset = fz > 20 ? -14 : 12; // above foot if it's in air
-  RCTX.globalAlpha = alpha * 0.7;
+  // Label near foot
+  const [,,fz] = leg.foot;
   RCTX.font = '8px monospace';
   RCTX.textAlign = 'center';
-  RCTX.fillStyle = '#aa8860';
-  RCTX.fillText(name, foot[0], foot[1] + tagOffset);
+  RCTX.fillStyle = col;
+  RCTX.fillText(name, foot[0], foot[1] + (fz > 20 ? -10 : 10));
 
   RCTX.globalAlpha = 1;
 }
