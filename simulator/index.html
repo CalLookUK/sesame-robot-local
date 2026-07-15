@@ -325,6 +325,7 @@ const FACE_FPS = { idle_blink:7, dead:2 };
 const STAND  = {R1:135,R2:45,L1:45,L2:135,R4:0,R3:180,L3:0,L4:180};
 const REST   = {R1:90,R2:90,L1:90,L2:90,R4:90,R3:90,L3:90,L4:90};
 const FD = 100;
+const WD = 180; // walk step delay — gives clear trot cadence at ~1.4 Hz
 
 const ANIMATIONS = {
   rest:  [{ face:'rest', mode:'boomerang', servos:REST, delay:0 }],
@@ -436,53 +437,74 @@ const ANIMATIONS = {
     { servos:{R4:45,R3:135,L3:0,L4:180},  delay:300 }, { servos:{R4:0,R3:180,L3:45,L4:135}, delay:300 },
     { face:'stand', mode:'once', servos:STAND, delay:0 },
   ],
+  // Trot gait: diagonal pairs alternate between STAND (planted strut) and REST (lifted).
+  // Group A = FR(R1,R2) + BL(L4,L3) | Group B = FL(L1,L2) + BR(R4,R3)
   forward: [
-    { face:'walk', mode:'once', delay:0 },
-    { servos:{R3:135,L3:45,R2:100,L1:25}, delay:FD },
-    { servos:{R3:135,L3:0}, delay:FD },
-    { servos:{L4:135,L2:90,R4:0,R1:180}, delay:FD },
-    { servos:{R2:45,L1:90},  delay:FD },
-    { servos:{R4:45,L4:180}, delay:FD },
-    { servos:{R3:180,L3:45,R2:90,L1:0}, delay:FD },
-    { servos:{L2:135,R1:90}, delay:FD },
-    { servos:{R3:135,L3:0}, delay:FD },
-    { servos:{L4:135,L2:90,R4:0,R1:180}, delay:FD },
-    { servos:{R2:45,L1:90},  delay:FD },
-    { servos:{R4:45,L4:180}, delay:FD },
-    { servos:{R3:180,L3:45,R2:90,L1:0}, delay:FD },
-    { servos:{L2:135,R1:90}, delay:FD },
+    { face:'walk', mode:'loop', servos:STAND, delay:WD },
+    { servos:{R1:90,R2:90,L4:90,L3:90}, delay:WD },          // A lifts
+    { servos:{R1:135,R2:45,L4:180,L3:0}, delay:WD },         // A plants
+    { servos:{L1:90,L2:90,R4:90,R3:90}, delay:WD },          // B lifts
+    { servos:{L1:45,L2:135,R4:0,R3:180}, delay:WD },         // B plants
+    { servos:{R1:90,R2:90,L4:90,L3:90}, delay:WD },
+    { servos:{R1:135,R2:45,L4:180,L3:0}, delay:WD },
+    { servos:{L1:90,L2:90,R4:90,R3:90}, delay:WD },
+    { servos:{L1:45,L2:135,R4:0,R3:180}, delay:WD },
+    { servos:{R1:90,R2:90,L4:90,L3:90}, delay:WD },
+    { servos:{R1:135,R2:45,L4:180,L3:0}, delay:WD },
+    { servos:{L1:90,L2:90,R4:90,R3:90}, delay:WD },
+    { servos:{L1:45,L2:135,R4:0,R3:180}, delay:WD },
     { face:'stand', mode:'once', servos:STAND, delay:0 },
   ],
+  // Reversed phase: B steps first — body weight shifts the other way, suggests reverse
   backward: [
-    { face:'walk', mode:'once', delay:FD },
-    { servos:{R3:135,L3:0}, delay:FD },
-    { servos:{L4:135,L2:135,R4:0,R1:90}, delay:FD },
-    { servos:{R2:90,L1:0},  delay:FD },
-    { servos:{R4:45,L4:180}, delay:FD },
-    { servos:{R3:180,L3:45,R2:45,L1:90}, delay:FD },
-    { servos:{L2:90,R1:180}, delay:FD },
-    { servos:{R3:135,L3:0}, delay:FD },
-    { servos:{L4:135,L2:135,R4:0,R1:90}, delay:FD },
-    { servos:{R2:90,L1:0},  delay:FD },
-    { servos:{R4:45,L4:180}, delay:FD },
-    { servos:{R3:180,L3:45,R2:45,L1:90}, delay:FD },
-    { servos:{L2:90,R1:180}, delay:FD },
+    { face:'walk', mode:'loop', servos:STAND, delay:WD },
+    { servos:{L1:90,L2:90,R4:90,R3:90}, delay:WD },          // B lifts
+    { servos:{L1:45,L2:135,R4:0,R3:180}, delay:WD },         // B plants
+    { servos:{R1:90,R2:90,L4:90,L3:90}, delay:WD },          // A lifts
+    { servos:{R1:135,R2:45,L4:180,L3:0}, delay:WD },         // A plants
+    { servos:{L1:90,L2:90,R4:90,R3:90}, delay:WD },
+    { servos:{L1:45,L2:135,R4:0,R3:180}, delay:WD },
+    { servos:{R1:90,R2:90,L4:90,L3:90}, delay:WD },
+    { servos:{R1:135,R2:45,L4:180,L3:0}, delay:WD },
+    { servos:{L1:90,L2:90,R4:90,R3:90}, delay:WD },
+    { servos:{L1:45,L2:135,R4:0,R3:180}, delay:WD },
+    { servos:{R1:90,R2:90,L4:90,L3:90}, delay:WD },
+    { servos:{R1:135,R2:45,L4:180,L3:0}, delay:WD },
     { face:'stand', mode:'once', servos:STAND, delay:0 },
   ],
+  // Left turn: right side (FR+BR) makes full steps; left side makes half-steps.
+  // Asymmetric stride shifts body weight rightward, rotating the robot left.
   left: [
-    { face:'walk', mode:'once', delay:0 },
-    { servos:{R3:135,L4:135}, delay:FD }, { servos:{R1:180,L2:180}, delay:FD },
-    { servos:{R3:180,L4:180}, delay:FD }, { servos:{R1:135,L2:135}, delay:FD },
-    { servos:{R4:45,L3:45},   delay:FD }, { servos:{R2:90,L1:90},   delay:FD },
-    { servos:{R4:0,L3:0},     delay:FD }, { servos:{R2:45,L1:45},   delay:FD },
+    { face:'walk', mode:'loop', servos:STAND, delay:WD },
+    { servos:{R1:90,R2:90,R4:90,R3:90}, delay:WD },          // right side lifts
+    { servos:{R1:135,R2:45,R4:0,R3:180}, delay:WD },         // right side plants
+    { servos:{L1:68,L2:112,L4:158,L3:22}, delay:WD },        // left side half-lift
+    { servos:{L1:45,L2:135,L4:180,L3:0}, delay:WD },         // left side plants
+    { servos:{R1:90,R2:90,R4:90,R3:90}, delay:WD },
+    { servos:{R1:135,R2:45,R4:0,R3:180}, delay:WD },
+    { servos:{L1:68,L2:112,L4:158,L3:22}, delay:WD },
+    { servos:{L1:45,L2:135,L4:180,L3:0}, delay:WD },
+    { servos:{R1:90,R2:90,R4:90,R3:90}, delay:WD },
+    { servos:{R1:135,R2:45,R4:0,R3:180}, delay:WD },
+    { servos:{L1:68,L2:112,L4:158,L3:22}, delay:WD },
+    { servos:{L1:45,L2:135,L4:180,L3:0}, delay:WD },
     { face:'stand', mode:'once', servos:STAND, delay:0 },
   ],
+  // Right turn: left side (FL+BL) makes full steps; right side makes half-steps.
   right: [
-    { face:'walk', mode:'once', delay:0 },
-    { servos:{R4:45,L3:45},   delay:FD }, { servos:{R2:0,L1:0},     delay:FD },
-    { servos:{R4:0,L3:0},     delay:FD }, { servos:{R2:45,L1:45},   delay:FD },
-    { servos:{R3:135,L4:135}, delay:FD }, { servos:{R1:90,L2:90},   delay:FD },
-    { servos:{R3:180,L4:180}, delay:FD }, { servos:{R1:135,L2:135}, delay:FD },
+    { face:'walk', mode:'loop', servos:STAND, delay:WD },
+    { servos:{L1:90,L2:90,L4:90,L3:90}, delay:WD },          // left side lifts
+    { servos:{L1:45,L2:135,L4:180,L3:0}, delay:WD },         // left side plants
+    { servos:{R1:112,R2:68,R4:22,R3:158}, delay:WD },        // right side half-lift
+    { servos:{R1:135,R2:45,R4:0,R3:180}, delay:WD },         // right side plants
+    { servos:{L1:90,L2:90,L4:90,L3:90}, delay:WD },
+    { servos:{L1:45,L2:135,L4:180,L3:0}, delay:WD },
+    { servos:{R1:112,R2:68,R4:22,R3:158}, delay:WD },
+    { servos:{R1:135,R2:45,R4:0,R3:180}, delay:WD },
+    { servos:{L1:90,L2:90,L4:90,L3:90}, delay:WD },
+    { servos:{L1:45,L2:135,L4:180,L3:0}, delay:WD },
+    { servos:{R1:112,R2:68,R4:22,R3:158}, delay:WD },
+    { servos:{R1:135,R2:45,R4:0,R3:180}, delay:WD },
     { face:'stand', mode:'once', servos:STAND, delay:0 },
   ],
 };
@@ -1095,6 +1117,8 @@ function _gaitTick(ts) {
 
 function startGait() {
   if (state.animTimer) { clearTimeout(state.animTimer); state.animTimer = null; state.animName = null; }
+  // Snap to STAND before starting so the first step is clean
+  Object.entries(STAND).forEach(([k, v]) => { state.servos[k] = v; });
   state.gait.active = true;
   state.gait.time   = 0;
   state.gait.legIsStance = [true, true, true, true];
@@ -1157,6 +1181,14 @@ document.addEventListener('keydown', e => {
 // ─────────────────────────────────────────────────────────────────────────────
 buildServoPanel();
 buildCmdGrid();
+// Start in STAND so the simulator matches the robot's physical resting pose
+Object.entries(STAND).forEach(([k, v]) => {
+  state.servos[k] = v;
+  const sl = document.getElementById('sv-'+k);
+  const vl = document.getElementById('sv-val-'+k);
+  if (sl) sl.value = v;
+  if (vl) vl.textContent = Math.round(v) + '°';
+});
 setFace('idle', 'boomerang');
 drawRobot();
 </script>
