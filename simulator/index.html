@@ -603,16 +603,16 @@ const UPP = 40, LOW = 38;  // segment lengths (mm)
 // Front legs: servo 45–135 maps to ≈ ±45° physical swing
 // Back legs: servo 0–180 maps to ≈ ±45° physical swing (half-scale)
 const LEGS = [
-  { name:'FR', hs:'R1', ks:'R2', mount:[ 28, 42, -8], dir0: N0,
+  { name:'FR', hs:'R1', ks:'R2', mount:[ 28,-42, -8], dir0: N0,
     hipFn:  v => (v - 90) * (Math.PI/180),
     kneeFn: v => -(v - 90) * (Math.PI/180) },
-  { name:'FL', hs:'L1', ks:'L2', mount:[-28, 42, -8], dir0: N0L,
+  { name:'FL', hs:'L1', ks:'L2', mount:[-28,-42, -8], dir0: N0L,
     hipFn:  v =>  (v - 90) * (Math.PI/180),
     kneeFn: v => -(v - 90) * (Math.PI/180) },
-  { name:'BR', hs:'R4', ks:'R3', mount:[ 28,-42, -8], dir0: N0,
+  { name:'BR', hs:'R4', ks:'R3', mount:[ 28, 42, -8], dir0: N0,
     hipFn:  v => -(v - 90) * (Math.PI/360),
     kneeFn: v =>  (v - 90) * (Math.PI/360) },
-  { name:'BL', hs:'L4', ks:'L3', mount:[-28,-42, -8], dir0: N0L,
+  { name:'BL', hs:'L4', ks:'L3', mount:[-28, 42, -8], dir0: N0L,
     hipFn:  v => -(v - 90) * (Math.PI/360),
     kneeFn: v =>  (v - 90) * (Math.PI/360) },
 ];
@@ -864,13 +864,34 @@ function setServo(n, v) {
   state.servos[n] = v;
   const sl = document.getElementById('sv-'+n), vl = document.getElementById('sv-val-'+n);
   if (sl) sl.value = v;
-  if (vl) vl.textContent = v + '°';
+  if (vl) vl.textContent = Math.round(v) + '°';
   drawRobot();
 }
 
-function setServos(obj) {
+// Smooth servo transition: lerp from current values to targets over `ms` milliseconds
+function setServos(obj, ms) {
   if (!obj) return;
-  Object.entries(obj).forEach(([k,v]) => setServo(k, v));
+  if (!ms || ms <= 0) { Object.entries(obj).forEach(([k,v]) => setServo(k, v)); return; }
+
+  const from = {};
+  const to   = {};
+  Object.entries(obj).forEach(([k,v]) => { from[k] = state.servos[k]; to[k] = v; });
+
+  const start = performance.now();
+  function tick(now) {
+    const t = Math.min((now - start) / ms, 1);
+    const ease = t < 0.5 ? 2*t*t : -1+(4-2*t)*t; // ease-in-out quad
+    Object.entries(to).forEach(([k,v]) => {
+      const cur = from[k] + (v - from[k]) * ease;
+      state.servos[k] = cur;
+      const sl = document.getElementById('sv-'+k), vl = document.getElementById('sv-val-'+k);
+      if (sl) sl.value = cur;
+      if (vl) vl.textContent = Math.round(cur) + '°';
+    });
+    drawRobot();
+    if (t < 1) requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -898,7 +919,8 @@ function runStep(seq) {
   const step = seq[state.animStepIdx++];
   logLine(`${state.animStepIdx}. ${descStep(step)}`);
   if (step.face)   setFace(step.face, step.mode || 'loop');
-  if (step.servos) setServos(step.servos);
+  const transMs = (step.delay || 0) / state.speed;
+  if (step.servos) setServos(step.servos, transMs * 0.9);
   const ms = (step.delay || 0) / state.speed;
   if (ms > 0) state.animTimer = setTimeout(() => runStep(seq), ms);
   else runStep(seq);
