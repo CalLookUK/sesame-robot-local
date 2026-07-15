@@ -664,6 +664,20 @@ function poly(pts, fill, stroke, sw) {
   if (stroke){ RCTX.strokeStyle = stroke; RCTX.lineWidth = sw||1; RCTX.stroke(); }
 }
 
+// Draw a circle lying flat on the floor plane (Z=0) centred at world (wx,wy).
+// Projects N sample points through iso() to get the correct isometric ellipse.
+function isoFloorCircle(wx, wy, r, fill, stroke, sw, N=32) {
+  RCTX.beginPath();
+  for (let i = 0; i <= N; i++) {
+    const a = (i / N) * Math.PI * 2;
+    const [sx, sy] = iso(wx + r * Math.cos(a), wy + r * Math.sin(a), 0);
+    i === 0 ? RCTX.moveTo(sx, sy) : RCTX.lineTo(sx, sy);
+  }
+  RCTX.closePath();
+  if (fill)  { RCTX.fillStyle   = fill;   RCTX.fill(); }
+  if (stroke){ RCTX.strokeStyle = stroke; RCTX.lineWidth = sw||1; RCTX.stroke(); }
+}
+
 // ── Main draw function ───────────────────────────────────────────────────────
 function drawRobot() {
   RCTX.clearRect(0, 0, CW, CH);
@@ -672,7 +686,13 @@ function drawRobot() {
   RCTX.fillStyle = '#080810';
   RCTX.fillRect(0, 0, CW, CH);
 
-  // ── compute all legs first ───────────────────────────────────────────────
+  // ── gravity: keep lowest grounded foot at Z=0 ───────────────────────────
+  // Compute legs at current BDY.cz, find how much the body needs to rise.
+  let rawLegs = LEGS.map(computeLeg);
+  const groundedZ = rawLegs.map(l => l.foot[2]);
+  const lowestZ = Math.min(...groundedZ);
+  if (lowestZ < 0) BDY.cz -= lowestZ; // push body up so no foot sinks below floor
+  // ── compute all legs at corrected body height ────────────────────────────
   const legs = LEGS.map(computeLeg);
 
   // ── floor ───────────────────────────────────────────────────────────────
@@ -695,26 +715,26 @@ function drawRobot() {
   // Floor border
   poly(fc, null, '#1e321e', 1.2);
 
-  // ── foot shadows on floor (all feet, under grounded ones especially) ─────
+  // ── floor contact ellipses ───────────────────────────────────────────────
   legs.forEach(leg => {
     const [fx, fy, fz] = leg.foot;
-    const sp = iso(fx, fy, 0); // shadow point on floor
-
     if (leg.grounded) {
-      // Bright contact ring
-      RCTX.globalAlpha = 0.6;
-      circle(sp, 10, null, '#ff8c42', 1.5);
-      RCTX.globalAlpha = 0.18;
-      circle(sp, 14, '#ff8c42');
+      // Outer glow ring
+      RCTX.globalAlpha = 0.15;
+      isoFloorCircle(fx, fy, 14, '#ff8c42');
+      // Contact ring
+      RCTX.globalAlpha = 0.7;
+      isoFloorCircle(fx, fy, 8, null, '#ff8c42', 1);
       RCTX.globalAlpha = 1;
-      // Tick mark: vertical stroke from foot to floor
+      // Vertical drop line from foot to floor
       const fp = iso(fx, fy, Math.max(fz, 0));
-      line(fp, sp, 'rgba(255,140,66,0.35)', 1);
+      const sp = iso(fx, fy, 0);
+      if (fz > 1) line(fp, sp, 'rgba(255,140,66,0.3)', 1);
     } else {
-      // Faint grey shadow proportional to height
-      const alpha = Math.max(0, 0.25 - fz * 0.002);
+      // Faint shadow blob shrinks as foot rises
+      const alpha = Math.max(0, 0.2 - fz * 0.002);
       RCTX.globalAlpha = alpha;
-      circle(sp, 5, '#aaaacc');
+      isoFloorCircle(fx, fy, 6, '#8888aa');
       RCTX.globalAlpha = 1;
     }
   });
