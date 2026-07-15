@@ -739,7 +739,10 @@ function computeLeg(leg) {
 function ikLeg(leg, fx, fy, fz) {
   const targetA  = Math.atan2(fy, fx);
   const neutralA = Math.atan2(leg.dir0[1], leg.dir0[0]);
-  const hipA     = targetA - neutralA;
+  // Normalise to [-π, π] to avoid wrap-around at the ±180° boundary
+  let hipA = targetA - neutralA;
+  while (hipA >  Math.PI) hipA -= 2 * Math.PI;
+  while (hipA < -Math.PI) hipA += 2 * Math.PI;
 
   const r   = Math.sqrt(fx*fx + fy*fy);
   let rk    = r - leg.upp;
@@ -1256,10 +1259,10 @@ function stopGait() {
 // CoM shift: before swinging a right leg shift body −X (left),
 //            before swinging a left leg shift body +X (right).
 // ─────────────────────────────────────────────────────────────────────────────
-const CG_VELOCITY  = 25;    // mm/s forward body speed
-const CG_STEP      = 34;    // mm stride length
+const CG_VELOCITY  = 20;    // mm/s forward body speed
+const CG_STEP      = 36;    // mm stride (tuned so relY_after_land = 3×cadence − threshold)
 const CG_HEIGHT    = 20;    // mm peak foot lift (parabolic arc)
-const CG_SWING_DUR = 0.32;  // seconds per swing phase
+const CG_SWING_DUR = 0.40;  // seconds per swing phase
 const CG_COM_DUR   = 0.20;  // seconds per CoM-shift phase
 const CG_COM_AMT   = 18;    // mm lateral CoM shift magnitude
 const CG_ORDER     = [0, 3, 1, 2]; // FR, BL, FL, BR
@@ -1282,16 +1285,18 @@ const CG = {
   raf: null,
 };
 
-// World-frame foot positions when all legs are in STAND pose (bodyX=0, bodyY=0)
+// World-frame foot positions at gait start — each foot placed directly outward
+// from its hip mount (hip servo = 90°, knee fully down), giving relY = 0 for all
+// legs so the first steps phase in naturally in creep order rather than all
+// triggering simultaneously.
 function cgStandFeet() {
-  return LEGS.map(leg => {
-    const hipA = leg.hipFn(STAND[leg.hs]);
-    const phys = leg.kneeFn(STAND[leg.ks]);
-    const [mx, my, mz] = leg.mount;
-    const ud = rotZ(leg.dir0, hipA);
-    const kbx = mx + ud[0]*leg.upp, kby = my + ud[1]*leg.upp;
-    const sp = Math.sin(phys), cp = Math.cos(phys);
-    return [kbx + ud[0]*sp*leg.low, kby + ud[1]*sp*leg.low, 0];
+  const cadence   = CG_VELOCITY * (CG_COM_DUR + CG_SWING_DUR); // body advance per step
+  const threshold = CG_STEP * 0.45;
+  return LEGS.map((leg, i) => {
+    const [mx, my] = leg.mount;
+    const orderPos = CG_ORDER.indexOf(i);
+    const footY    = orderPos * cadence + my - threshold;
+    return [mx + leg.dir0[0] * leg.upp, footY, 0];
   });
 }
 
@@ -1346,6 +1351,7 @@ function cgTick(ts) {
     }
 
   } else if (CG.phase === 'com_shift') {
+    CG.bodyY += CG_VELOCITY * dt;
     CG.comT += dt / CG_COM_DUR;
     if (CG.comT >= 1) {
       CG.comT    = 1;
@@ -1370,6 +1376,7 @@ function cgTick(ts) {
     }
 
   } else { // 'swing'
+    CG.bodyY += CG_VELOCITY * dt;
     CG.swingT += dt / CG_SWING_DUR;
     if (CG.swingT >= 1) {
       CG.swingT = 1;
