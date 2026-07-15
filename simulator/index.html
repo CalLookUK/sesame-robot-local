@@ -156,6 +156,7 @@ h1{
 }
 .ctrl-btn:hover{border-color:var(--orange)}
 .ctrl-btn.primary{background:var(--orange);border-color:var(--orange);color:#000;font-weight:700}
+.ctrl-btn.walk-active{background:#22aa55;border-color:#22aa55;color:#fff;font-weight:700}
 .speed-row{display:flex;align-items:center;gap:5px;font-size:10px;color:var(--text-dim)}
 .speed-row input[type=range]{width:65px}
 
@@ -217,6 +218,7 @@ h1{
       <div class="label">Commands</div>
       <div class="cmd-grid" id="cmd-grid"></div>
       <div class="controls">
+        <button class="ctrl-btn" id="btn-walk">🐾 Walk</button>
         <button class="ctrl-btn primary" id="btn-stop">■ Stop</button>
         <div class="speed-row">
           Speed:
@@ -495,6 +497,7 @@ let state = {
   pitch: 0, roll: 0,   // body orientation (radians); updated each frame
   frame: 0,            // draw-frame counter
   legChanged: [0,0,0,0], // frame each leg's servos were last set (FR,FL,BR,BL)
+  gait: { active: false, time: 0, speed: 1.2, legIsStance: [true,true,true,true] },
 };
 // Which servo name belongs to which leg index (FR=0, FL=1, BR=2, BL=3)
 const SERVO_LEG = {R1:0,R2:0, L1:1,L2:1, R4:2,R3:2, L4:3,L3:3};
@@ -729,10 +732,11 @@ function drawRobot() {
             mz + ud[2]*UPP + ld[2]*LOW];
   });
 
-  // Support set: stance legs (servos stable ≥ STANCE_FRAMES) define the ground.
-  // Swing legs (recently changed) are excluded so the body doesn't follow them up.
-  const stance = bfFeet.filter((_, i) => state.frame - state.legChanged[i] >= STANCE_FRAMES);
-  const supportBF = stance.length >= 1 ? stance : bfFeet;
+  // Support set: gait mode uses explicit stance flags; otherwise use frame-silence detection.
+  const _stance = state.gait.active
+    ? bfFeet.filter((_, i) => state.gait.legIsStance[i])
+    : bfFeet.filter((_, i) => state.frame - state.legChanged[i] >= STANCE_FRAMES);
+  const supportBF = _stance.length >= 1 ? _stance : bfFeet;
 
   // Fit plane in body frame → target pitch and roll.
   // bodyToWorld applies rotY(pitch) then rotX(roll). For the rotated body-frame
@@ -1038,15 +1042,114 @@ function logLine(msg) {
 function clearLog() { document.getElementById('step-log').innerHTML = ''; }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// CONTINUOUS TROT GAIT
+// ─────────────────────────────────────────────────────────────────────────────
+// Sesame is a sprawled/spider posture: hip joints rotate in the lateral-vertical
+// plane (XZ), not fore-aft. Walking is produced by alternating diagonal leg pairs
+// between their planted STAND strut and their lifted REST retracted position.
+// The body rocks naturally via the support-plane dynamics already in drawRobot().
+//
+// Trot pairs  — leg index: 0=FR, 1=FL, 2=BR, 3=BL
+//   Group A (FR + BL, phase offset 0):   stance 0–0.5, swing 0.5–1.0
+//   Group B (FL + BR, phase offset 0.5): stance 0–0.5, swing 0.5–1.0
+
+const GAIT_PHASE_OFF = [0, 0.5, 0.5, 0];          // per-leg phase offset
+const GAIT_STA_HIP   = [135,  45,   0, 180];       // STAND hip  (foot on floor)
+const GAIT_STA_KNEE  = [ 45, 135, 180,   0];       // STAND knee (foot on floor)
+const GAIT_SWG_HIP   = [ 90,  90,  90,  90];       // REST  hip  (foot ~37mm up)
+const GAIT_SWG_KNEE  = [ 90,  90,  90,  90];       // REST  knee
+
+let _gaitRAF = null, _gaitLastT = 0;
+
+function _gaitTick(ts) {
+  if (!state.gait.active) return;
+  const dt = Math.min((ts - _gaitLastT) / 1000, 0.05);
+  _gaitLastT = ts;
+  state.gait.time += dt * state.gait.speed;
+
+  for (let i = 0; i < 4; i++) {
+    const phase = (state.gait.time + GAIT_PHASE_OFF[i]) % 1;
+    state.gait.legIsStance[i] = phase < 0.5;
+
+    // Swing arc: sine bell 0→1→0 over the swing half-cycle
+    const lift  = phase < 0.5 ? 0 : Math.sin(Math.PI * (phase - 0.5) / 0.5);
+    const hip   = GAIT_STA_HIP[i]  + (GAIT_SWG_HIP[i]  - GAIT_STA_HIP[i])  * lift;
+    const knee  = GAIT_STA_KNEE[i] + (GAIT_SWG_KNEE[i] - GAIT_STA_KNEE[i]) * lift;
+
+    const leg = LEGS[i];
+    state.servos[leg.hs] = hip;
+    state.servos[leg.ks] = knee;
+    const hsl = document.getElementById('sv-'+leg.hs);
+    const ksl = document.getElementById('sv-'+leg.ks);
+    const hvl = document.getElementById('sv-val-'+leg.hs);
+    const kvl = document.getElementById('sv-val-'+leg.ks);
+    if (hsl) hsl.value = hip;
+    if (ksl) ksl.value = knee;
+    if (hvl) hvl.textContent = Math.round(hip)  + '°';
+    if (kvl) kvl.textContent = Math.round(knee) + '°';
+  }
+
+  drawRobot();
+  _gaitRAF = requestAnimationFrame(_gaitTick);
+}
+
+function startGait() {
+  if (state.animTimer) { clearTimeout(state.animTimer); state.animTimer = null; state.animName = null; }
+  state.gait.active = true;
+  state.gait.time   = 0;
+  state.gait.legIsStance = [true, true, true, true];
+  setFace('walk', 'loop');
+  const btn = document.getElementById('btn-walk');
+  if (btn) { btn.textContent = '⏹ Stop Walk'; btn.classList.add('walk-active'); }
+  _gaitLastT = performance.now();
+  _gaitRAF = requestAnimationFrame(_gaitTick);
+  logLine('🐾 trot gait started');
+}
+
+function stopGait() {
+  state.gait.active = false;
+  if (_gaitRAF) { cancelAnimationFrame(_gaitRAF); _gaitRAF = null; }
+  const btn = document.getElementById('btn-walk');
+  if (btn) { btn.textContent = '🐾 Walk'; btn.classList.remove('walk-active'); }
+  setFace('stand', 'once');
+  Object.entries(STAND).forEach(([k, v]) => {
+    state.servos[k] = v;
+    const sl = document.getElementById('sv-'+k);
+    const vl = document.getElementById('sv-val-'+k);
+    if (sl) sl.value = v;
+    if (vl) vl.textContent = Math.round(v) + '°';
+  });
+  drawRobot();
+  logLine('⏹ gait stopped');
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // CONTROLS
 // ─────────────────────────────────────────────────────────────────────────────
-document.getElementById('btn-stop').addEventListener('click', () => { stopAnim(); logLine('■ stopped'); });
+document.getElementById('btn-walk').addEventListener('click', () => {
+  if (state.gait.active) stopGait(); else startGait();
+});
+
+document.getElementById('btn-stop').addEventListener('click', () => {
+  if (state.gait.active) stopGait();
+  stopAnim();
+  logLine('■ stopped');
+});
 
 const speedSlider = document.getElementById('speed-slider');
 const speedVal    = document.getElementById('speed-val');
 speedSlider.addEventListener('input', () => {
   state.speed = speedSlider.value / 100;
+  state.gait.speed = 1.2 * state.speed;  // scale trot frequency with speed slider
   speedVal.textContent = state.speed.toFixed(2).replace(/\.?0+$/,'') + '×';
+});
+
+// Keyboard: W toggles trot gait
+document.addEventListener('keydown', e => {
+  if (e.target.tagName === 'INPUT') return;
+  if (e.key === 'w' || e.key === 'W') {
+    if (state.gait.active) stopGait(); else startGait();
+  }
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
