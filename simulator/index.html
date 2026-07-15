@@ -492,6 +492,7 @@ let state = {
   servos: {R1:90,R2:90,L1:90,L2:90,R4:90,R3:90,L3:90,L4:90},
   face:'idle', faceMode:'loop', faceFrameIdx:0, faceDir:1,
   faceFrameTimer:null, animTimer:null, animName:null, speed:1.0,
+  pitch: 0, roll: 0,   // body orientation (radians); updated each frame
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -581,10 +582,42 @@ function iso(wx, wy, wz) {
   ];
 }
 
-// Rotate a direction vector around the world Y axis
+// Rotate a direction vector around the Y axis
 function rotY(v, a) {
   const c = Math.cos(a), s = Math.sin(a);
   return [v[0]*c + v[2]*s, v[1], -v[0]*s + v[2]*c];
+}
+// Rotate a direction vector around the X axis
+function rotX(v, a) {
+  const c = Math.cos(a), s = Math.sin(a);
+  return [v[0], v[1]*c - v[2]*s, v[1]*s + v[2]*c];
+}
+
+// Transform a body-frame offset to world space, applying body pitch and roll.
+// Body frame: X=right, Y=back, Z=up, origin at BDY centre.
+function bodyToWorld(bx, by, bz) {
+  const v = rotX(rotY([bx, by, bz], state.pitch), state.roll);
+  return [BDY.cx + v[0], BDY.cy + v[1], BDY.cz + v[2]];
+}
+
+// Fit a plane to an array of [x,y,z] points; return the upward unit normal.
+function fitPlane(pts) {
+  if (pts.length < 3) return [0, 0, 1];
+  const c = pts.reduce((a, p) => [a[0]+p[0], a[1]+p[1], a[2]+p[2]], [0,0,0])
+               .map(v => v / pts.length);
+  let n = [0, 0, 0];
+  for (let i = 0; i < pts.length; i++) {
+    const j = (i + 1) % pts.length;
+    const v1 = pts[i].map((v, k) => v - c[k]);
+    const v2 = pts[j].map((v, k) => v - c[k]);
+    n[0] += v1[1]*v2[2] - v1[2]*v2[1];
+    n[1] += v1[2]*v2[0] - v1[0]*v2[2];
+    n[2] += v1[0]*v2[1] - v1[1]*v2[0];
+  }
+  const len = Math.sqrt(n[0]*n[0] + n[1]*n[1] + n[2]*n[2]);
+  if (len < 0.001) return [0, 0, 1];
+  const sign = n[2] < 0 ? -1 : 1;
+  return n.map(v => v * sign / len);
 }
 
 // ── Robot geometry (mm) ──────────────────────────────────────────────────────
@@ -621,27 +654,19 @@ function computeLeg(leg) {
   const hv = state.servos[leg.hs], kv = state.servos[leg.ks];
   const hipA = leg.hipFn(hv), kneeA = leg.kneeFn(kv);
 
-  // Hip joint world position
-  const hx = BDY.cx + leg.mount[0];
-  const hy = BDY.cy + leg.mount[1];
-  const hz = BDY.cz + leg.mount[2];
-
-  // Upper-leg direction after hip rotation
+  // All FK in body frame, then transform to world via bodyToWorld().
+  // This means body pitch/roll naturally rotates the whole leg assembly.
+  const [mx, my, mz] = leg.mount;
   const ud = rotY(leg.dir0, hipA);
-
-  // Knee joint
-  const kx = hx + ud[0]*UPP, ky = hy + ud[1]*UPP, kz = hz + ud[2]*UPP;
-
-  // Lower-leg direction (knee bends relative to upper segment, same axis)
+  const kbx = mx + ud[0]*UPP, kby = my + ud[1]*UPP, kbz = mz + ud[2]*UPP;
   const ld = rotY(ud, kneeA);
+  const fbx = kbx + ld[0]*LOW, fby = kby + ld[1]*LOW, fbz = kbz + ld[2]*LOW;
 
-  // Foot
-  const fx = kx + ld[0]*LOW, fy = ky + ld[1]*LOW, fz = kz + ld[2]*LOW;
+  const hip  = bodyToWorld(mx, my, mz);
+  const knee = bodyToWorld(kbx, kby, kbz);
+  const foot = bodyToWorld(fbx, fby, fbz);
 
-  return {
-    hip:[hx,hy,hz], knee:[kx,ky,kz], foot:[fx,fy,fz],
-    grounded: fz <= 6,
-  };
+  return { hip, knee, foot, grounded: foot[2] <= 30 };
 }
 
 // ── Drawing helpers ──────────────────────────────────────────────────────────
@@ -686,13 +711,31 @@ function drawRobot() {
   RCTX.fillStyle = '#080810';
   RCTX.fillRect(0, 0, CW, CH);
 
-  // ── gravity: keep lowest grounded foot at Z=0 ───────────────────────────
-  // Compute legs at current BDY.cz, find how much the body needs to rise.
-  let rawLegs = LEGS.map(computeLeg);
-  const groundedZ = rawLegs.map(l => l.foot[2]);
-  const lowestZ = Math.min(...groundedZ);
-  if (lowestZ < 0) BDY.cz -= lowestZ; // push body up so no foot sinks below floor
-  // ── compute all legs at corrected body height ────────────────────────────
+  // ── body dynamics: pitch/roll from support plane, then height solve ───────
+  // Pass 1: compute legs with current orientation to identify grounded feet.
+  const pass1 = LEGS.map(computeLeg);
+  const allZ  = pass1.map(l => l.foot[2]);
+  const minZ  = Math.min(...allZ);
+  // Feet within 25 mm of the lowest foot are considered the support set.
+  const support = pass1.filter(l => l.foot[2] <= minZ + 25).map(l => l.foot);
+
+  // Fit a plane to the support set → target pitch and roll.
+  const normal = fitPlane(support);
+  // normal ≈ (nx, ny, nz); derive pitch (rot around Y) and roll (rot around X)
+  const tgtPitch = Math.atan2(-normal[0], normal[2]);
+  const tgtRoll  = Math.atan2( normal[1], normal[2]);
+  const MAX_TILT = 0.45; // ≈ 26° max tilt
+  const clamp = (v, m) => Math.max(-m, Math.min(m, v));
+  // Smooth toward target with a spring-like filter (tau ≈ 8 frames)
+  state.pitch += (clamp(tgtPitch, MAX_TILT) - state.pitch) * 0.12;
+  state.roll  += (clamp(tgtRoll,  MAX_TILT) - state.roll)  * 0.12;
+
+  // Pass 2: recompute legs with updated orientation, then solve height.
+  const pass2 = LEGS.map(computeLeg);
+  const lowestZ = Math.min(...pass2.map(l => l.foot[2]));
+  if (lowestZ < 0) BDY.cz -= lowestZ;
+
+  // Pass 3: final leg positions for drawing.
   const legs = LEGS.map(computeLeg);
 
   // ── floor ───────────────────────────────────────────────────────────────
@@ -742,13 +785,14 @@ function drawRobot() {
   // ── all legs (back behind body, front in front) ──────────────────────────
   [3, 2].forEach(i => _drawLeg(legs[i], LEGS[i].name, true));
 
-  // ── body box wireframe ────────────────────────────────────────────────────
-  const {cx, cy, cz, w, d, h} = BDY;
+  // ── body box wireframe (corners in body frame → world via bodyToWorld) ────
+  const {w, d, h} = BDY;
+  const bw = p => iso(...bodyToWorld(...p));
   const C = [
-    iso(cx-w/2, cy-d/2, cz-h/2), iso(cx+w/2, cy-d/2, cz-h/2),  // 0,1 bottom-front
-    iso(cx+w/2, cy+d/2, cz-h/2), iso(cx-w/2, cy+d/2, cz-h/2),  // 2,3 bottom-back
-    iso(cx-w/2, cy-d/2, cz+h/2), iso(cx+w/2, cy-d/2, cz+h/2),  // 4,5 top-front
-    iso(cx+w/2, cy+d/2, cz+h/2), iso(cx-w/2, cy+d/2, cz+h/2),  // 6,7 top-back
+    bw([-w/2, -d/2, -h/2]), bw([w/2, -d/2, -h/2]),  // 0,1 bottom-front
+    bw([ w/2,  d/2, -h/2]), bw([-w/2,  d/2, -h/2]),  // 2,3 bottom-back
+    bw([-w/2, -d/2,  h/2]), bw([w/2, -d/2,  h/2]),   // 4,5 top-front
+    bw([ w/2,  d/2,  h/2]), bw([-w/2,  d/2,  h/2]),  // 6,7 top-back
   ];
   const EDGES = [[0,1],[1,2],[2,3],[3,0],[4,5],[5,6],[6,7],[7,4],[0,4],[1,5],[2,6],[3,7]];
   EDGES.forEach(([a,b]) => line(C[a], C[b], '#ff8c42', 1));
@@ -756,10 +800,10 @@ function drawRobot() {
   // "FRONT" / "BACK" labels
   RCTX.font = 'bold 8px monospace';
   RCTX.textAlign = 'center';
-  const frontMid = iso(cx, cy-d/2, cz);
+  const frontMid = iso(...bodyToWorld(0, -d/2, 0));
   RCTX.fillStyle = 'rgba(255,140,66,0.6)';
   RCTX.fillText('FRONT', frontMid[0], frontMid[1]+3);
-  const backMid  = iso(cx, cy+d/2, cz);
+  const backMid  = iso(...bodyToWorld(0,  d/2, 0));
   RCTX.fillStyle = 'rgba(255,140,66,0.35)';
   RCTX.fillText('BACK', backMid[0], backMid[1]+3);
 
