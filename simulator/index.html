@@ -1049,19 +1049,22 @@ function clearLog() { document.getElementById('step-log').innerHTML = ''; }
 // ─────────────────────────────────────────────────────────────────────────────
 // CONTINUOUS TROT GAIT
 // ─────────────────────────────────────────────────────────────────────────────
-// Sesame is a sprawled/spider posture: hip joints rotate in the lateral-vertical
-// plane (XZ), not fore-aft. Walking is produced by alternating diagonal leg pairs
-// between their planted STAND strut and their lifted REST retracted position.
-// The body rocks naturally via the support-plane dynamics already in drawRobot().
+// Hip joints sweep in the horizontal X-Y plane (Z-axis shaft).
+// Diagonal pairs alternate: A=(FR+BL) and B=(FL+BR).
+// Leg index: 0=FR, 1=FL, 2=BR, 3=BL
+//   Group A (FR+BL, phase 0):   stance 0–0.5, swing 0.5–1.0
+//   Group B (FL+BR, phase 0.5): stance 0–0.5, swing 0.5–1.0
 //
-// Trot pairs  — leg index: 0=FR, 1=FL, 2=BR, 3=BL
-//   Group A (FR + BL, phase offset 0):   stance 0–0.5, swing 0.5–1.0
-//   Group B (FL + BR, phase offset 0.5): stance 0–0.5, swing 0.5–1.0
+// Servo values per leg — FR(0), FL(1), BR(2), BL(3):
+//   FR: hip=R1(STAND=135,REST=90), knee=R3(STAND=180,REST=90)
+//   FL: hip=L1(STAND=45, REST=90), knee=L3(STAND=0,  REST=90)
+//   BR: hip=R2(STAND=45, REST=90), knee=R4(STAND=0,  REST=90)
+//   BL: hip=L2(STAND=135,REST=90), knee=L4(STAND=180,REST=90)
 
-const GAIT_PHASE_OFF = [0, 0.5, 0.5, 0];          // per-leg phase offset
-const GAIT_STA_HIP   = [135,  45,   0, 180];       // STAND hip  (foot on floor)
-const GAIT_STA_KNEE  = [ 45, 135, 180,   0];       // STAND knee (foot on floor)
-const GAIT_SWG_HIP   = [ 90,  90,  90,  90];       // REST  hip  (foot ~37mm up)
+const GAIT_PHASE_OFF = [  0, 0.5, 0.5,   0];      // per-leg phase offset
+const GAIT_STA_HIP   = [135,  45,  45, 135];       // STAND hip  (foot on floor)
+const GAIT_STA_KNEE  = [180,   0,   0, 180];       // STAND knee (foot on floor)
+const GAIT_SWG_HIP   = [ 90,  90,  90,  90];       // REST  hip  (foot lifted)
 const GAIT_SWG_KNEE  = [ 90,  90,  90,  90];       // REST  knee
 
 let _gaitRAF = null, _gaitLastT = 0;
