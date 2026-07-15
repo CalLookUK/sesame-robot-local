@@ -741,43 +741,12 @@ function drawRobot() {
   RCTX.fillStyle = '#080810';
   RCTX.fillRect(0, 0, CW, CH);
 
-  // ── body dynamics ────────────────────────────────────────────────────────
-  // Compute feet in body frame only — independent of pitch/roll and BDY.cz.
-  // This breaks the circular dependency that was pulling feet off the ground.
-  const bfFeet = LEGS.map(leg => {
-    const hv = state.servos[leg.hs], kv = state.servos[leg.ks];
-    const ud = rotY(leg.dir0, leg.hipFn(hv));
-    const ld = rotY(ud, leg.kneeFn(kv));
-    const [mx, my, mz] = leg.mount;
-    return [mx + ud[0]*UPP + ld[0]*LOW,
-            my + ud[1]*UPP + ld[1]*LOW,
-            mz + ud[2]*UPP + ld[2]*LOW];
-  });
-
-  // Support set: gait mode uses explicit stance flags; otherwise use frame-silence detection.
-  const _stance = state.gait.active
-    ? bfFeet.filter((_, i) => state.gait.legIsStance[i])
-    : bfFeet.filter((_, i) => state.frame - state.legChanged[i] >= STANCE_FRAMES);
-  const supportBF = _stance.length >= 1 ? _stance : bfFeet;
-
-  // Fit plane in body frame → target pitch and roll.
-  // bodyToWorld applies rotY(pitch) then rotX(roll). For the rotated body-frame
-  // normal n to equal world (0,0,1), correct targets are:
-  const n = fitPlane(supportBF);
-  const MAX_TILT = 0.38;
-  const cl = v => Math.max(-MAX_TILT, Math.min(MAX_TILT, v));
-  state.pitch += (cl( Math.atan2(n[0], n[2])) - state.pitch) * 0.12;
-  state.roll  += (cl(-Math.atan2(n[1], n[2])) - state.roll)  * 0.12;
-
-  // Height solve: BDY.cz so the lowest contact point lands exactly at Z=0.
-  // Contact points are: grounded feet + the 4 body bottom corners (belly).
-  // When legs fold enough, the belly wins and the robot rests on the floor.
-  // World Z of body-frame point p = BDY.cz + rotX(rotY(p, pitch), roll)[2]
-  // → constraint: BDY.cz ≥ −rotX(rotY(p, pitch), roll)[2]
-  const belly = [[-BDY.w/2,-BDY.d/2,-BDY.h/2],[BDY.w/2,-BDY.d/2,-BDY.h/2],
-                 [BDY.w/2,BDY.d/2,-BDY.h/2],[-BDY.w/2,BDY.d/2,-BDY.h/2]];
-  const contactPts = [...supportBF, ...belly];
-  BDY.cz = Math.max(...contactPts.map(p => -rotX(rotY(p, state.pitch), state.roll)[2]));
+  // ── body position: fixed (robot held in space) ───────────────────────────
+  // Body stays level at a constant height so legs move purely from servo
+  // commands — no reactive physics. Good clean baseline for tuning animations.
+  state.pitch = 0;
+  state.roll  = 0;
+  BDY.cz = 72;  // mm above floor — chosen so STAND pose feet sit at ~floor level
 
   // Compute world-space leg geometry for drawing.
   const legs = LEGS.map(computeLeg);
