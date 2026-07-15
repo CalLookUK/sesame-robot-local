@@ -743,8 +743,8 @@ function drawRobot() {
   // When legs fold enough, the belly wins and the robot rests on the floor.
   // World Z of body-frame point p = BDY.cz + rotX(rotY(p, pitch), roll)[2]
   // → constraint: BDY.cz ≥ −rotX(rotY(p, pitch), roll)[2]
-  const {w, d, h} = BDY;
-  const belly = [[-w/2,-d/2,-h/2],[w/2,-d/2,-h/2],[w/2,d/2,-h/2],[-w/2,d/2,-h/2]];
+  const belly = [[-BDY.w/2,-BDY.d/2,-BDY.h/2],[BDY.w/2,-BDY.d/2,-BDY.h/2],
+                 [BDY.w/2,BDY.d/2,-BDY.h/2],[-BDY.w/2,BDY.d/2,-BDY.h/2]];
   const contactPts = [...supportBF, ...belly];
   BDY.cz = Math.max(...contactPts.map(p => -rotX(rotY(p, state.pitch), state.roll)[2]));
 
