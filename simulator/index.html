@@ -711,31 +711,39 @@ function drawRobot() {
   RCTX.fillStyle = '#080810';
   RCTX.fillRect(0, 0, CW, CH);
 
-  // ── body dynamics: pitch/roll from support plane, then height solve ───────
-  // Pass 1: compute legs with current orientation to identify grounded feet.
-  const pass1 = LEGS.map(computeLeg);
-  const allZ  = pass1.map(l => l.foot[2]);
-  const minZ  = Math.min(...allZ);
-  // Feet within 25 mm of the lowest foot are considered the support set.
-  const support = pass1.filter(l => l.foot[2] <= minZ + 25).map(l => l.foot);
+  // ── body dynamics ────────────────────────────────────────────────────────
+  // Compute feet in body frame only — independent of pitch/roll and BDY.cz.
+  // This breaks the circular dependency that was pulling feet off the ground.
+  const bfFeet = LEGS.map(leg => {
+    const hv = state.servos[leg.hs], kv = state.servos[leg.ks];
+    const ud = rotY(leg.dir0, leg.hipFn(hv));
+    const ld = rotY(ud, leg.kneeFn(kv));
+    const [mx, my, mz] = leg.mount;
+    return [mx + ud[0]*UPP + ld[0]*LOW,
+            my + ud[1]*UPP + ld[1]*LOW,
+            mz + ud[2]*UPP + ld[2]*LOW];
+  });
 
-  // Fit a plane to the support set → target pitch and roll.
-  const normal = fitPlane(support);
-  // normal ≈ (nx, ny, nz); derive pitch (rot around Y) and roll (rot around X)
-  const tgtPitch = Math.atan2(-normal[0], normal[2]);
-  const tgtRoll  = Math.atan2( normal[1], normal[2]);
-  const MAX_TILT = 0.45; // ≈ 26° max tilt
-  const clamp = (v, m) => Math.max(-m, Math.min(m, v));
-  // Smooth toward target with a spring-like filter (tau ≈ 8 frames)
-  state.pitch += (clamp(tgtPitch, MAX_TILT) - state.pitch) * 0.12;
-  state.roll  += (clamp(tgtRoll,  MAX_TILT) - state.roll)  * 0.12;
+  // Support set: feet within 25 mm of the body-frame lowest point.
+  const bfZ    = bfFeet.map(f => f[2]);
+  const minBFZ = Math.min(...bfZ);
+  const supportBF = bfFeet.filter(f => f[2] <= minBFZ + 25);
 
-  // Pass 2: recompute legs with updated orientation, then solve height.
-  const pass2 = LEGS.map(computeLeg);
-  const lowestZ = Math.min(...pass2.map(l => l.foot[2]));
-  if (lowestZ < 0) BDY.cz -= lowestZ;
+  // Fit plane in body frame → target pitch and roll.
+  // bodyToWorld applies rotY(pitch) then rotX(roll). For the rotated body-frame
+  // normal n to equal world (0,0,1), correct targets are:
+  const n = fitPlane(supportBF);
+  const MAX_TILT = 0.38;
+  const cl = v => Math.max(-MAX_TILT, Math.min(MAX_TILT, v));
+  state.pitch += (cl( Math.atan2(n[0], n[2])) - state.pitch) * 0.12;
+  state.roll  += (cl(-Math.atan2(n[1], n[2])) - state.roll)  * 0.12;
 
-  // Pass 3: final leg positions for drawing.
+  // Height solve: find BDY.cz so the lowest support foot lands exactly at Z=0.
+  // World Z of a body-frame foot f = BDY.cz + rotX(rotY(f, pitch), roll)[2]
+  // → BDY.cz = max over support of  −rotX(rotY(f, pitch), roll)[2]
+  BDY.cz = Math.max(...supportBF.map(f => -rotX(rotY(f, state.pitch), state.roll)[2]));
+
+  // Compute world-space leg geometry for drawing.
   const legs = LEGS.map(computeLeg);
 
   // ── floor ───────────────────────────────────────────────────────────────
