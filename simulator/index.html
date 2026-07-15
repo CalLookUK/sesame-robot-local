@@ -757,40 +757,10 @@ function drawRobot() {
   RCTX.fillStyle = '#080810';
   RCTX.fillRect(0, 0, CW, CH);
 
-  // ── body dynamics ─────────────────────────────────────────────────────────
-  // Step 1: feet in body frame — independent of pitch/roll/BDY.cz (no circular dep).
-  const bfFeet = LEGS.map(leg => {
-    const ud = rotZ(leg.dir0, leg.hipFn(state.servos[leg.hs]));
-    const physAngle = leg.kneeFn(state.servos[leg.ks]);
-    const sp = Math.sin(physAngle), cp = Math.cos(physAngle);
-    const ld = [ud[0]*sp, ud[1]*sp, -cp];
-    const [mx, my, mz] = leg.mount;
-    return [mx + ud[0]*leg.upp + ld[0]*leg.low,
-            my + ud[1]*leg.upp + ld[1]*leg.low,
-            mz                 + ld[2]*leg.low];  // ud[2]=0, kbz=mz
-  });
-
-  // Step 2: which feet define the support plane?
-  //   Gait mode → explicit stance flags. Otherwise → all 4 feet.
-  const groundedBF = state.gait.active
-    ? bfFeet.filter((_, i) => state.gait.legIsStance[i])
-    : bfFeet;
-  const supportBF = groundedBF.length >= 1 ? groundedBF : bfFeet;
-
-  // Step 3: fit plane to support feet in body frame → target pitch & roll.
-  const n = fitPlane(supportBF);
-  const cl = v => Math.max(-0.4, Math.min(0.4, v));
-  state.pitch += (cl( Math.atan2(n[0], n[2])) - state.pitch) * 0.18;
-  state.roll  += (cl(-Math.atan2(n[1], n[2])) - state.roll)  * 0.18;
-
-  // Step 4: height solve — raise body so every support foot lands at world Z = 0.
-  //   world_z = BDY.cz + rotX(rotY(p, pitch), roll)[2]
-  //   → BDY.cz = max(-rotX(rotY(p, pitch), roll)[2]) over contact points.
-  const belly = [[-BDY.w/2,-BDY.d/2,-BDY.h/2],[BDY.w/2,-BDY.d/2,-BDY.h/2],
-                 [ BDY.w/2, BDY.d/2,-BDY.h/2],[-BDY.w/2, BDY.d/2,-BDY.h/2]];
-  const contactPts = [...supportBF, ...belly];
-  const targetCz = Math.max(...contactPts.map(p => -rotX(rotY(p, state.pitch), state.roll)[2]));
-  BDY.cz += (targetCz - BDY.cz) * 0.35;
+  // ── body: fixed level orientation ────────────────────────────────────────
+  // Body stays perfectly level (pitch=0, roll=0) and at a fixed height.
+  state.pitch = 0;
+  state.roll  = 0;
 
   // Compute world-space leg geometry for drawing.
   const legs = LEGS.map(computeLeg);
