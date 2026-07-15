@@ -817,11 +817,6 @@ function drawRobot() {
   RCTX.fillStyle = '#080810';
   RCTX.fillRect(0, 0, CW, CH);
 
-  // ── body: fixed level orientation ────────────────────────────────────────
-  // Body stays perfectly level (pitch=0, roll=0) and at a fixed height.
-  state.pitch = 0;
-  state.roll  = 0;
-
   // Compute world-space leg geometry for drawing.
   const legs = LEGS.map(computeLeg);
 
@@ -1166,12 +1161,30 @@ function runStep(seq) {
   if (state.animStepIdx >= seq.length) { stopAnim(); logLine('✓ done'); return; }
   const step = seq[state.animStepIdx++];
   logLine(`${state.animStepIdx}. ${descStep(step)}`);
-  if (step.face)   setFace(step.face, step.mode || 'loop');
+  if (step.face) setFace(step.face, step.mode || 'loop');
   const transMs = (step.delay || 0) / state.speed;
-  if (step.servos) setServos(step.servos, transMs * 0.9);
+  if (step.servos) {
+    // Solve gravity from TARGET servo values before interpolation starts,
+    // so the body pose is physically correct throughout the transition.
+    if (!FW.active && !CG.active) {
+      const merged = { ...state.servos, ...step.servos };
+      const stanceFlags = LEGS.map(leg => leg.kneeFn(merged[leg.ks]) < 0.18);
+      const footBodies  = LEGS.map(leg => {
+        const hipA = leg.hipFn(merged[leg.hs]);
+        const physA = leg.kneeFn(merged[leg.ks]);
+        const [mx, my, mz] = leg.mount;
+        const ud = rotZ(leg.dir0, hipA);
+        const sp = Math.sin(physA), cp = Math.cos(physA);
+        return [mx+ud[0]*(leg.upp+sp*leg.low), my+ud[1]*(leg.upp+sp*leg.low), mz-cp*leg.low];
+      });
+      const { cz, pitch, roll } = solveBodyGravity(footBodies, stanceFlags);
+      BDY.cz = cz; state.pitch = pitch; state.roll = roll;
+    }
+    setServos(step.servos, transMs * 0.9);
+  }
   const ms = (step.delay || 0) / state.speed;
-  if (ms > 0) state.animTimer = setTimeout(() => { applyGravityPose(); runStep(seq); }, ms);
-  else { applyGravityPose(); runStep(seq); }
+  if (ms > 0) state.animTimer = setTimeout(() => { runStep(seq); }, ms);
+  else runStep(seq);
 }
 
 function descStep(s) {
