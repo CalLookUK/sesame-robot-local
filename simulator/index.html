@@ -6,115 +6,234 @@
 <title>Sesame Robot Simulator</title>
 <style>
 :root {
-  --orange: #ff8c42;
-  --orange-dark: #cc6b29;
-  --orange-glow: rgba(255,140,66,0.25);
-  --bg: #0a0a0f;
-  --panel: #141420;
-  --panel2: #1c1c2a;
-  --border: #2a2a3a;
-  --text: #e0e0e0;
-  --text-dim: #888;
-  --green: #00e800;
-  --green-dim: #004800;
+  --orange:     #ff8c42;
+  --orange-dk:  #cc6020;
+  --orange-dim: rgba(255,140,66,0.18);
+  --bg:         #090910;
+  --panel:      #111118;
+  --panel2:     #18181f;
+  --border:     #252530;
+  --text:       #d8d8e8;
+  --text-dim:   #666680;
+  --green:      #00e000;
+  --green-dim:  #003800;
 }
 *{box-sizing:border-box;margin:0;padding:0}
-body{background:var(--bg);color:var(--text);font-family:'Segoe UI',Roboto,sans-serif;min-height:100vh;padding:12px}
-h1{color:var(--orange);font-size:20px;font-weight:700;letter-spacing:2px;text-align:center;margin-bottom:12px;text-shadow:0 0 20px var(--orange-glow)}
-.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;max-width:960px;margin:0 auto}
-@media(max-width:680px){.grid{grid-template-columns:1fr}}
-.panel{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:12px}
-.panel-title{font-size:10px;font-weight:700;color:var(--orange);letter-spacing:2px;text-transform:uppercase;margin-bottom:10px}
+body{
+  background:var(--bg);
+  color:var(--text);
+  font-family:'Segoe UI',system-ui,sans-serif;
+  min-height:100vh;
+  padding:12px;
+}
 
-/* OLED */
-#oled-wrap{display:flex;flex-direction:column;align-items:center;gap:8px}
-#oled{border:2px solid #1a3a1a;border-radius:4px;image-rendering:pixelated;image-rendering:crisp-edges;display:block;max-width:100%;background:#000}
-#face-label{font-size:11px;color:var(--text-dim);font-family:monospace;letter-spacing:1px}
+/* ── layout ── */
+h1{
+  color:var(--orange);
+  font-size:17px;
+  font-weight:700;
+  letter-spacing:3px;
+  text-transform:uppercase;
+  text-align:center;
+  margin-bottom:12px;
+  opacity:.9;
+}
+.grid{
+  display:grid;
+  grid-template-columns:260px 1fr;
+  gap:10px;
+  max-width:900px;
+  margin:0 auto;
+}
+@media(max-width:660px){.grid{grid-template-columns:1fr}}
+.panel{
+  background:var(--panel);
+  border:1px solid var(--border);
+  border-radius:10px;
+  padding:10px;
+}
+.label{
+  font-size:9px;
+  font-weight:700;
+  color:var(--orange);
+  letter-spacing:2px;
+  text-transform:uppercase;
+  margin-bottom:8px;
+  opacity:.8;
+}
 
-/* Robot diagram */
-#robot-wrap{display:flex;justify-content:center}
-#robot{border-radius:8px;max-width:100%}
+/* ── oled ── */
+#oled-wrap{display:flex;flex-direction:column;align-items:center;gap:6px}
+#oled{
+  border:2px solid #0a2010;
+  border-radius:3px;
+  image-rendering:pixelated;
+  image-rendering:crisp-edges;
+  display:block;
+  width:100%;
+  max-width:240px;
+  height:auto;
+}
+#face-label{
+  font-size:10px;
+  color:var(--text-dim);
+  font-family:monospace;
+  letter-spacing:1px;
+}
 
-/* Servo panel */
-.servo-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+/* ── servos ── */
+.servo-grid{display:flex;flex-direction:column;gap:5px;margin-top:4px}
 .servo-row{display:flex;align-items:center;gap:6px}
-.servo-name{font-family:monospace;font-size:11px;color:var(--orange);min-width:28px;font-weight:700}
-.servo-slider{flex:1;-webkit-appearance:none;height:4px;border-radius:2px;background:var(--border);outline:none;cursor:pointer}
-.servo-slider::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;border-radius:50%;background:var(--orange);cursor:pointer}
-.servo-val{font-family:monospace;font-size:11px;color:var(--text-dim);min-width:30px;text-align:right}
+.sname{
+  font-family:monospace;
+  font-size:10px;
+  color:var(--orange);
+  min-width:26px;
+  font-weight:700;
+  opacity:.9;
+}
+.sslider{
+  flex:1;
+  -webkit-appearance:none;
+  height:3px;
+  border-radius:2px;
+  background:var(--border);
+  outline:none;
+  cursor:pointer;
+}
+.sslider::-webkit-slider-thumb{
+  -webkit-appearance:none;
+  width:12px;height:12px;
+  border-radius:50%;
+  background:var(--orange);
+  cursor:pointer;
+}
+.sval{
+  font-family:monospace;
+  font-size:10px;
+  color:var(--text-dim);
+  min-width:32px;
+  text-align:right;
+}
 
-/* Commands */
-.cmd-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(76px,1fr));gap:6px}
-.cmd-btn{background:var(--panel2);border:1px solid var(--border);color:var(--text);padding:8px 4px;border-radius:8px;font-size:12px;cursor:pointer;transition:all 0.15s;text-transform:capitalize;font-family:inherit}
-.cmd-btn:hover{border-color:var(--orange);color:var(--orange);background:#1e1e30}
+/* ── robot panel ── */
+#robot-wrap{display:flex;justify-content:center}
+#robot{display:block;width:100%;max-width:500px;height:auto;border-radius:6px}
+
+/* ── commands ── */
+.cmd-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(68px,1fr));
+  gap:5px;
+  margin-top:4px;
+}
+.cmd-btn{
+  background:var(--panel2);
+  border:1px solid var(--border);
+  color:var(--text);
+  padding:7px 4px;
+  border-radius:7px;
+  font-size:11px;
+  cursor:pointer;
+  transition:border-color .12s, color .12s, background .12s;
+  font-family:inherit;
+  line-height:1.3;
+}
+.cmd-btn:hover{border-color:var(--orange);color:var(--orange)}
 .cmd-btn.active{background:var(--orange);color:#000;border-color:var(--orange);font-weight:700}
-.cmd-btn:disabled{opacity:0.4;cursor:not-allowed}
 
-/* Controls */
-.controls{display:flex;align-items:center;gap:10px;margin-top:10px;flex-wrap:wrap}
-.ctrl-btn{background:var(--panel2);border:1px solid var(--border);color:var(--text);padding:6px 12px;border-radius:6px;font-size:12px;cursor:pointer;transition:all 0.15s}
-.ctrl-btn:hover{border-color:var(--orange);color:var(--orange)}
+/* ── controls ── */
+.controls{display:flex;align-items:center;gap:8px;margin-top:8px;flex-wrap:wrap}
+.ctrl-btn{
+  background:var(--panel2);
+  border:1px solid var(--border);
+  color:var(--text);
+  padding:5px 10px;
+  border-radius:6px;
+  font-size:11px;
+  cursor:pointer;
+  transition:border-color .12s;
+}
+.ctrl-btn:hover{border-color:var(--orange)}
 .ctrl-btn.primary{background:var(--orange);border-color:var(--orange);color:#000;font-weight:700}
-.speed-row{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--text-dim)}
-.speed-row input{width:80px}
+.speed-row{display:flex;align-items:center;gap:5px;font-size:10px;color:var(--text-dim)}
+.speed-row input[type=range]{width:65px}
 
-/* Step log */
-#step-log{font-family:monospace;font-size:10px;color:var(--text-dim);max-height:80px;overflow-y:auto;padding:4px;background:var(--bg);border-radius:4px;margin-top:8px;line-height:1.6}
-#step-log .current{color:var(--orange)}
+/* ── step log ── */
+#step-log{
+  font-family:monospace;
+  font-size:9px;
+  color:var(--text-dim);
+  max-height:56px;
+  overflow-y:auto;
+  padding:4px 6px;
+  background:var(--bg);
+  border-radius:4px;
+  margin-top:6px;
+  line-height:1.7;
+}
+#step-log .cur{color:var(--orange)}
 
-/* Full-width bottom panels */
-.full{grid-column:1/-1}
+/* ── right col stacks ── */
+.right-col{display:flex;flex-direction:column;gap:10px}
+.left-col{display:flex;flex-direction:column;gap:10px}
 </style>
 </head>
 <body>
 
-<h1>⬡ SESAME ROBOT SIMULATOR</h1>
+<h1>⬡ Sesame Robot Simulator</h1>
 
 <div class="grid">
 
-  <!-- OLED Face -->
-  <div class="panel">
-    <div class="panel-title">OLED Face Display</div>
-    <div id="oled-wrap">
-      <canvas id="oled" width="384" height="192"></canvas>
-      <div id="face-label">idle</div>
-    </div>
-  </div>
+  <!-- LEFT: OLED + Servos -->
+  <div class="left-col">
 
-  <!-- Robot diagram -->
-  <div class="panel">
-    <div class="panel-title">Robot — Top-Down View</div>
-    <div id="robot-wrap">
-      <canvas id="robot" width="340" height="280"></canvas>
-    </div>
-  </div>
-
-  <!-- Servos -->
-  <div class="panel">
-    <div class="panel-title">Servo Positions</div>
-    <div class="servo-grid" id="servo-panel"></div>
-  </div>
-
-  <!-- Commands -->
-  <div class="panel">
-    <div class="panel-title">Commands</div>
-    <div class="cmd-grid" id="cmd-grid"></div>
-    <div class="controls">
-      <button class="ctrl-btn primary" id="btn-stop">■ Stop</button>
-      <div class="speed-row">
-        Speed: <input type="range" id="speed-slider" min="25" max="300" value="100" style="width:70px">
-        <span id="speed-val">1×</span>
+    <div class="panel">
+      <div class="label">OLED Display</div>
+      <div id="oled-wrap">
+        <canvas id="oled" width="384" height="192"></canvas>
+        <div id="face-label">idle</div>
       </div>
     </div>
-    <div id="step-log"></div>
+
+    <div class="panel">
+      <div class="label">Servo Positions</div>
+      <div class="servo-grid" id="servo-panel"></div>
+    </div>
+
   </div>
 
+  <!-- RIGHT: Robot + Commands -->
+  <div class="right-col">
+
+    <div class="panel">
+      <div class="label">3D View</div>
+      <div id="robot-wrap">
+        <canvas id="robot" width="500" height="340"></canvas>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="label">Commands</div>
+      <div class="cmd-grid" id="cmd-grid"></div>
+      <div class="controls">
+        <button class="ctrl-btn primary" id="btn-stop">■ Stop</button>
+        <div class="speed-row">
+          Speed:
+          <input type="range" id="speed-slider" min="20" max="300" value="100">
+          <span id="speed-val">1×</span>
+        </div>
+      </div>
+      <div id="step-log"></div>
+    </div>
+
+  </div>
 </div>
 
 <script>
-// ─────────────────────────────────────────────────────────────────────
-// BITMAP DATA (auto-injected)
-// ─────────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// BITMAP DATA
+// ─────────────────────────────────────────────────────────────────────────────
 const BITMAPS = {
   epd_bitmap_talk_sleepy: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 224, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 15, 0, 3, 192, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7, 128, 7, 192, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7, 192, 7, 128, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 192, 15, 128, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 224, 15, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 224, 31, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 240, 31, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 240, 30, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 240, 30, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 240, 62, 0, 0, 3, 254, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 240, 62, 0, 0, 3, 254, 0, 0, 0, 0, 0, 0, 255, 128, 0, 0, 248, 62, 0, 0, 3, 254, 0, 0, 0, 0, 0, 0, 255, 128, 0, 0, 248, 62, 0, 0, 3, 254, 0, 0, 0, 0, 0, 0, 255, 128, 0, 0, 248, 62, 0, 0, 1, 252, 0, 14, 3, 129, 192, 0, 127, 0, 0, 0, 248, 62, 0, 0, 0, 248, 0, 14, 3, 129, 192, 0, 62, 0, 0, 0, 248, 62, 0, 0, 0, 0, 0, 14, 3, 129, 192, 0, 0, 0, 0, 0, 248, 62, 0, 0, 0, 0, 0, 14, 3, 129, 192, 0, 0, 0, 0, 0, 248, 62, 0, 0, 3, 128, 0, 15, 7, 129, 192, 0, 192, 0, 0, 0, 240, 30, 0, 0, 3, 254, 0, 7, 7, 193, 192, 0, 255, 0, 0, 0, 240, 31, 0, 0, 0, 0, 0, 7, 143, 195, 192, 0, 0, 0, 0, 1, 240, 31, 0, 0, 0, 0, 0, 3, 255, 255, 128, 0, 0, 0, 0, 1, 240, 15, 0, 0, 0, 0, 0, 1, 252, 127, 0, 0, 0, 0, 0, 1, 224, 15, 128, 0, 0, 0, 0, 0, 14, 112, 0, 0, 0, 0, 0, 3, 224, 15, 128, 0, 0, 0, 0, 0, 15, 240, 0, 0, 0, 0, 0, 3, 192, 7, 192, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7, 192, 3, 192, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7, 128, 3, 224, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 15, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
   epd_bitmap_sleepy: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 224, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 15, 0, 3, 192, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7, 128, 7, 192, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7, 192, 7, 128, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 192, 15, 128, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 224, 15, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 224, 31, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 240, 31, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 240, 30, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 240, 30, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 240, 62, 0, 0, 3, 254, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 240, 62, 0, 0, 3, 254, 0, 0, 0, 0, 0, 0, 255, 128, 0, 0, 248, 62, 0, 0, 3, 254, 0, 0, 0, 0, 0, 0, 255, 128, 0, 0, 248, 62, 0, 0, 3, 254, 0, 0, 0, 0, 0, 0, 255, 128, 0, 0, 248, 62, 0, 0, 1, 252, 0, 14, 3, 129, 192, 0, 127, 0, 0, 0, 248, 62, 0, 0, 0, 248, 0, 14, 3, 129, 192, 0, 62, 0, 0, 0, 248, 62, 0, 0, 0, 0, 0, 14, 3, 129, 192, 0, 0, 0, 0, 0, 248, 62, 0, 0, 0, 0, 0, 14, 3, 129, 192, 0, 0, 0, 0, 0, 248, 62, 0, 0, 3, 128, 0, 15, 7, 129, 192, 0, 192, 0, 0, 0, 240, 30, 0, 0, 3, 254, 0, 7, 7, 193, 192, 0, 255, 0, 0, 0, 240, 31, 0, 0, 0, 0, 0, 7, 143, 195, 192, 0, 0, 0, 0, 1, 240, 31, 0, 0, 0, 0, 0, 3, 255, 255, 128, 0, 0, 0, 0, 1, 240, 15, 0, 0, 0, 0, 0, 1, 252, 127, 0, 0, 0, 0, 0, 1, 224, 15, 128, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 224, 15, 128, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 192, 7, 192, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7, 192, 3, 192, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7, 128, 3, 224, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 15, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
@@ -164,344 +283,265 @@ const BITMAPS = {
   epd_bitmap_idle_blink_3: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 224, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 15, 0, 3, 192, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7, 128, 7, 192, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7, 192, 7, 128, 0, 3, 192, 0, 0, 0, 0, 0, 0, 3, 192, 0, 3, 192, 15, 128, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 224, 15, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 224, 31, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 240, 31, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 240, 30, 0, 0, 0, 248, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 240, 30, 0, 0, 3, 252, 0, 0, 0, 0, 0, 0, 63, 128, 0, 0, 240, 62, 0, 0, 3, 254, 0, 0, 0, 0, 0, 0, 255, 128, 0, 0, 240, 62, 0, 0, 3, 254, 0, 0, 0, 0, 0, 0, 255, 128, 0, 0, 248, 62, 0, 0, 3, 254, 0, 0, 0, 0, 0, 0, 255, 128, 0, 0, 248, 62, 0, 0, 1, 248, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 248, 62, 0, 0, 0, 0, 0, 14, 3, 129, 192, 0, 0, 0, 0, 0, 248, 62, 0, 0, 0, 0, 0, 14, 3, 129, 192, 0, 0, 0, 0, 0, 248, 62, 0, 0, 0, 0, 0, 14, 3, 129, 192, 0, 0, 0, 0, 0, 248, 62, 0, 0, 0, 0, 0, 14, 3, 129, 192, 0, 0, 0, 0, 0, 248, 62, 0, 0, 0, 0, 0, 15, 7, 129, 192, 0, 0, 0, 0, 0, 240, 30, 0, 0, 0, 0, 0, 7, 7, 193, 192, 0, 0, 0, 0, 0, 240, 31, 0, 0, 0, 0, 0, 7, 143, 195, 192, 0, 0, 0, 0, 1, 240, 31, 0, 0, 0, 0, 0, 3, 255, 255, 128, 0, 0, 0, 0, 1, 240, 15, 0, 0, 0, 0, 0, 1, 252, 127, 0, 0, 0, 0, 0, 1, 224, 15, 128, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 224, 15, 128, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 192, 7, 192, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7, 192, 3, 192, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7, 128, 3, 224, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 15, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
 };
 
-// ─────────────────────────────────────────────────────────────────────
-// FACE CONFIGURATION
-// ─────────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// FACE CONFIG
+// ─────────────────────────────────────────────────────────────────────────────
 const FACE_FRAMES = {
-  walk:         ['epd_bitmap_walk'],
-  rest:         ['epd_bitmap_rest','epd_bitmap_rest_1','epd_bitmap_rest_2'],
-  swim:         ['epd_bitmap_swim'],
-  dance:        ['epd_bitmap_dance','epd_bitmap_dance_1'],
-  wave:         ['epd_bitmap_wave'],
-  point:        ['epd_bitmap_point','epd_bitmap_point_1','epd_bitmap_point_2'],
-  stand:        [],
-  cute:         ['epd_bitmap_cute'],
-  pushup:       ['epd_bitmap_pushup'],
-  freaky:       ['epd_bitmap_freaky'],
-  bow:          ['epd_bitmap_bow'],
-  worm:         ['epd_bitmap_worm'],
-  shake:        ['epd_bitmap_shake'],
-  shrug:        ['epd_bitmap_shrug'],
-  dead:         ['epd_bitmap_dead','epd_bitmap_dead_1','epd_bitmap_dead_2'],
-  crab:         ['epd_bitmap_crab'],
-  idle:         ['epd_bitmap_idle'],
-  idle_blink:   ['epd_bitmap_idle_blink','epd_bitmap_idle_blink_1','epd_bitmap_idle_blink_2','epd_bitmap_idle_blink_3'],
-  happy:        ['epd_bitmap_happy'],
-  talk_happy:   ['epd_bitmap_talk_happy'],
-  sad:          ['epd_bitmap_sad'],
-  talk_sad:     ['epd_bitmap_talk_sad'],
-  angry:        ['epd_bitmap_angry'],
-  talk_angry:   ['epd_bitmap_talk_angry'],
-  surprised:    ['epd_bitmap_surprised'],
-  talk_surprised:['epd_bitmap_talk_surprised'],
-  sleepy:       ['epd_bitmap_sleepy'],
-  talk_sleepy:  ['epd_bitmap_talk_sleepy'],
-  love:         ['epd_bitmap_love'],
-  talk_love:    ['epd_bitmap_talk_love'],
-  excited:      ['epd_bitmap_excited'],
-  talk_excited: ['epd_bitmap_talk_excited'],
-  confused:     ['epd_bitmap_confused'],
-  talk_confused:['epd_bitmap_talk_confused'],
-  thinking:     ['epd_bitmap_thinking'],
-  talk_thinking:['epd_bitmap_talk_thinking'],
+  walk:          ['epd_bitmap_walk'],
+  rest:          ['epd_bitmap_rest','epd_bitmap_rest_1','epd_bitmap_rest_2'],
+  swim:          ['epd_bitmap_swim'],
+  dance:         ['epd_bitmap_dance','epd_bitmap_dance_1'],
+  wave:          ['epd_bitmap_wave'],
+  point:         ['epd_bitmap_point','epd_bitmap_point_1','epd_bitmap_point_2'],
+  stand:         [],
+  cute:          ['epd_bitmap_cute'],
+  pushup:        ['epd_bitmap_pushup'],
+  freaky:        ['epd_bitmap_freaky'],
+  bow:           ['epd_bitmap_bow'],
+  worm:          ['epd_bitmap_worm'],
+  shake:         ['epd_bitmap_shake'],
+  shrug:         ['epd_bitmap_shrug'],
+  dead:          ['epd_bitmap_dead','epd_bitmap_dead_1','epd_bitmap_dead_2'],
+  crab:          ['epd_bitmap_crab'],
+  idle:          ['epd_bitmap_idle'],
+  idle_blink:    ['epd_bitmap_idle_blink','epd_bitmap_idle_blink_1','epd_bitmap_idle_blink_2','epd_bitmap_idle_blink_3'],
+  happy:         ['epd_bitmap_happy'],        talk_happy:    ['epd_bitmap_talk_happy'],
+  sad:           ['epd_bitmap_sad'],          talk_sad:      ['epd_bitmap_talk_sad'],
+  angry:         ['epd_bitmap_angry'],        talk_angry:    ['epd_bitmap_talk_angry'],
+  surprised:     ['epd_bitmap_surprised'],    talk_surprised:['epd_bitmap_talk_surprised'],
+  sleepy:        ['epd_bitmap_sleepy'],       talk_sleepy:   ['epd_bitmap_talk_sleepy'],
+  love:          ['epd_bitmap_love'],         talk_love:     ['epd_bitmap_talk_love'],
+  excited:       ['epd_bitmap_excited'],      talk_excited:  ['epd_bitmap_talk_excited'],
+  confused:      ['epd_bitmap_confused'],     talk_confused: ['epd_bitmap_talk_confused'],
+  thinking:      ['epd_bitmap_thinking'],     talk_thinking: ['epd_bitmap_talk_thinking'],
 };
+const FACE_FPS = { idle_blink:7, dead:2 };
 
-const FACE_FPS = {
-  idle_blink:7, dead:2,
-  // everything else: 1
-};
-
-// ─────────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
 // ANIMATION SEQUENCES
-// Each step: { face?, servos?: {name:angle,...}, delay:ms }
-// Servos not mentioned keep previous value.
-// ─────────────────────────────────────────────────────────────────────
-const STAND = { R1:135,R2:45,L1:45,L2:135,R4:0,R3:180,L3:0,L4:180 };
-const REST  = { R1:90,R2:90,L1:90,L2:90,R4:90,R3:90,L3:90,L4:90 };
-const FD = 100; // frameDelay
+// ─────────────────────────────────────────────────────────────────────────────
+const STAND  = {R1:135,R2:45,L1:45,L2:135,R4:0,R3:180,L3:0,L4:180};
+const REST   = {R1:90,R2:90,L1:90,L2:90,R4:90,R3:90,L3:90,L4:90};
+const FD = 100;
 
 const ANIMATIONS = {
-  rest: [
-    { face:'rest', mode:'boomerang', servos:REST, delay:0 }
-  ],
-  stand: [
-    { face:'stand', mode:'once', servos:STAND, delay:0 }
-  ],
+  rest:  [{ face:'rest', mode:'boomerang', servos:REST, delay:0 }],
+  stand: [{ face:'stand', mode:'once', servos:STAND, delay:0 }],
   wave: [
     { face:'wave', mode:'once', delay:0 },
     { servos:STAND, delay:200 },
     { servos:{R4:80,L3:180,L2:90,R1:100}, delay:200 },
     { servos:{L3:180}, delay:300 },
-    { servos:{L3:180}, delay:300 },{ servos:{L3:100}, delay:300 },
-    { servos:{L3:180}, delay:300 },{ servos:{L3:100}, delay:300 },
-    { servos:{L3:180}, delay:300 },{ servos:{L3:100}, delay:300 },
-    { servos:{L3:180}, delay:300 },{ servos:{L3:100}, delay:300 },
-    { face:'stand', mode:'once', servos:STAND, delay:0 }
+    { servos:{L3:180}, delay:300 }, { servos:{L3:100}, delay:300 },
+    { servos:{L3:180}, delay:300 }, { servos:{L3:100}, delay:300 },
+    { servos:{L3:180}, delay:300 }, { servos:{L3:100}, delay:300 },
+    { servos:{L3:180}, delay:300 }, { servos:{L3:100}, delay:300 },
+    { face:'stand', mode:'once', servos:STAND, delay:0 },
   ],
   dance: [
     { face:'dance', mode:'loop', delay:0 },
     { servos:{R1:90,R2:90,L1:90,L2:90,R4:160,R3:160,L3:10,L4:10}, delay:300 },
-    { servos:{R4:115,R3:115,L3:10,L4:10}, delay:300 },
-    { servos:{R4:160,R3:160,L3:65,L4:65}, delay:300 },
-    { servos:{R4:115,R3:115,L3:10,L4:10}, delay:300 },
-    { servos:{R4:160,R3:160,L3:65,L4:65}, delay:300 },
-    { servos:{R4:115,R3:115,L3:10,L4:10}, delay:300 },
-    { servos:{R4:160,R3:160,L3:65,L4:65}, delay:300 },
-    { servos:{R4:115,R3:115,L3:10,L4:10}, delay:300 },
-    { servos:{R4:160,R3:160,L3:65,L4:65}, delay:300 },
-    { servos:{R4:115,R3:115,L3:10,L4:10}, delay:300 },
-    { servos:{R4:160,R3:160,L3:65,L4:65}, delay:300 },
-    { face:'stand', mode:'once', servos:STAND, delay:0 }
+    { servos:{R4:115,R3:115,L3:10,L4:10},  delay:300 }, { servos:{R4:160,R3:160,L3:65,L4:65},  delay:300 },
+    { servos:{R4:115,R3:115,L3:10,L4:10},  delay:300 }, { servos:{R4:160,R3:160,L3:65,L4:65},  delay:300 },
+    { servos:{R4:115,R3:115,L3:10,L4:10},  delay:300 }, { servos:{R4:160,R3:160,L3:65,L4:65},  delay:300 },
+    { servos:{R4:115,R3:115,L3:10,L4:10},  delay:300 }, { servos:{R4:160,R3:160,L3:65,L4:65},  delay:300 },
+    { servos:{R4:115,R3:115,L3:10,L4:10},  delay:300 }, { servos:{R4:160,R3:160,L3:65,L4:65},  delay:300 },
+    { face:'stand', mode:'once', servos:STAND, delay:0 },
   ],
   swim: [
     { face:'swim', mode:'once', servos:REST, delay:0 },
-    { servos:{R1:135,R2:45,L1:45,L2:135}, delay:400 },
-    { servos:{R1:90,R2:90,L1:90,L2:90}, delay:400 },
-    { servos:{R1:135,R2:45,L1:45,L2:135}, delay:400 },
-    { servos:{R1:90,R2:90,L1:90,L2:90}, delay:400 },
-    { servos:{R1:135,R2:45,L1:45,L2:135}, delay:400 },
-    { servos:{R1:90,R2:90,L1:90,L2:90}, delay:400 },
-    { servos:{R1:135,R2:45,L1:45,L2:135}, delay:400 },
-    { servos:{R1:90,R2:90,L1:90,L2:90}, delay:400 },
-    { face:'stand', mode:'once', servos:STAND, delay:0 }
+    { servos:{R1:135,R2:45,L1:45,L2:135}, delay:400 }, { servos:{R1:90,R2:90,L1:90,L2:90}, delay:400 },
+    { servos:{R1:135,R2:45,L1:45,L2:135}, delay:400 }, { servos:{R1:90,R2:90,L1:90,L2:90}, delay:400 },
+    { servos:{R1:135,R2:45,L1:45,L2:135}, delay:400 }, { servos:{R1:90,R2:90,L1:90,L2:90}, delay:400 },
+    { servos:{R1:135,R2:45,L1:45,L2:135}, delay:400 }, { servos:{R1:90,R2:90,L1:90,L2:90}, delay:400 },
+    { face:'stand', mode:'once', servos:STAND, delay:0 },
   ],
   point: [
     { face:'point', mode:'boomerang', delay:0 },
     { servos:{L2:90,R1:135,R2:100,L4:180,L1:25,L3:145,R4:80,R3:170}, delay:2000 },
-    { face:'stand', mode:'once', servos:STAND, delay:0 }
+    { face:'stand', mode:'once', servos:STAND, delay:0 },
   ],
   pushup: [
     { face:'pushup', mode:'once', servos:STAND, delay:200 },
     { servos:{L1:0,R1:180,L3:90,R3:90}, delay:500 },
-    { servos:{L3:0,R3:180}, delay:600 },{ servos:{L3:90,R3:90}, delay:500 },
-    { servos:{L3:0,R3:180}, delay:600 },{ servos:{L3:90,R3:90}, delay:500 },
-    { servos:{L3:0,R3:180}, delay:600 },{ servos:{L3:90,R3:90}, delay:500 },
-    { servos:{L3:0,R3:180}, delay:600 },{ servos:{L3:90,R3:90}, delay:500 },
-    { face:'stand', mode:'once', servos:STAND, delay:0 }
+    { servos:{L3:0,R3:180}, delay:600 }, { servos:{L3:90,R3:90}, delay:500 },
+    { servos:{L3:0,R3:180}, delay:600 }, { servos:{L3:90,R3:90}, delay:500 },
+    { servos:{L3:0,R3:180}, delay:600 }, { servos:{L3:90,R3:90}, delay:500 },
+    { servos:{L3:0,R3:180}, delay:600 }, { servos:{L3:90,R3:90}, delay:500 },
+    { face:'stand', mode:'once', servos:STAND, delay:0 },
   ],
   bow: [
     { face:'bow', mode:'once', servos:STAND, delay:200 },
     { servos:{L1:0,R1:180,L3:0,R3:180,L2:180,R2:0,R4:0,L4:180}, delay:600 },
     { servos:{L3:90,R3:90}, delay:3000 },
-    { face:'stand', mode:'once', servos:STAND, delay:0 }
+    { face:'stand', mode:'once', servos:STAND, delay:0 },
   ],
   cute: [
     { face:'cute', mode:'once', servos:STAND, delay:200 },
     { servos:{L2:160,R2:20,R4:180,L4:0,L1:0,R1:180,L3:180,R3:0}, delay:200 },
-    { servos:{R4:180,L4:45}, delay:300 },{ servos:{R4:135,L4:0}, delay:300 },
-    { servos:{R4:180,L4:45}, delay:300 },{ servos:{R4:135,L4:0}, delay:300 },
-    { servos:{R4:180,L4:45}, delay:300 },{ servos:{R4:135,L4:0}, delay:300 },
-    { servos:{R4:180,L4:45}, delay:300 },{ servos:{R4:135,L4:0}, delay:300 },
-    { servos:{R4:180,L4:45}, delay:300 },{ servos:{R4:135,L4:0}, delay:300 },
-    { face:'stand', mode:'once', servos:STAND, delay:0 }
+    { servos:{R4:180,L4:45}, delay:300 }, { servos:{R4:135,L4:0}, delay:300 },
+    { servos:{R4:180,L4:45}, delay:300 }, { servos:{R4:135,L4:0}, delay:300 },
+    { servos:{R4:180,L4:45}, delay:300 }, { servos:{R4:135,L4:0}, delay:300 },
+    { servos:{R4:180,L4:45}, delay:300 }, { servos:{R4:135,L4:0}, delay:300 },
+    { servos:{R4:180,L4:45}, delay:300 }, { servos:{R4:135,L4:0}, delay:300 },
+    { face:'stand', mode:'once', servos:STAND, delay:0 },
   ],
   freaky: [
     { face:'freaky', mode:'once', servos:STAND, delay:200 },
     { servos:{L1:0,R1:180,L2:180,R2:0,R4:90,R3:0}, delay:200 },
-    { servos:{R3:25}, delay:400 },{ servos:{R3:0}, delay:400 },
-    { servos:{R3:25}, delay:400 },{ servos:{R3:0}, delay:400 },
-    { servos:{R3:25}, delay:400 },{ servos:{R3:0}, delay:400 },
-    { face:'stand', mode:'once', servos:STAND, delay:0 }
+    { servos:{R3:25}, delay:400 }, { servos:{R3:0}, delay:400 },
+    { servos:{R3:25}, delay:400 }, { servos:{R3:0}, delay:400 },
+    { servos:{R3:25}, delay:400 }, { servos:{R3:0}, delay:400 },
+    { face:'stand', mode:'once', servos:STAND, delay:0 },
   ],
   worm: [
     { face:'worm', mode:'once', servos:STAND, delay:200 },
     { servos:{R1:180,R2:0,L1:0,L2:180,R4:90,R3:90,L3:90,L4:90}, delay:200 },
-    { servos:{R3:45,L3:135,R4:45,L4:135}, delay:300 },
-    { servos:{R3:135,L3:45,R4:135,L4:45}, delay:300 },
-    { servos:{R3:45,L3:135,R4:45,L4:135}, delay:300 },
-    { servos:{R3:135,L3:45,R4:135,L4:45}, delay:300 },
-    { servos:{R3:45,L3:135,R4:45,L4:135}, delay:300 },
-    { servos:{R3:135,L3:45,R4:135,L4:45}, delay:300 },
-    { servos:{R3:45,L3:135,R4:45,L4:135}, delay:300 },
-    { servos:{R3:135,L3:45,R4:135,L4:45}, delay:300 },
-    { servos:{R3:45,L3:135,R4:45,L4:135}, delay:300 },
-    { servos:{R3:135,L3:45,R4:135,L4:45}, delay:300 },
-    { face:'stand', mode:'once', servos:STAND, delay:0 }
+    { servos:{R3:45,L3:135,R4:45,L4:135}, delay:300 }, { servos:{R3:135,L3:45,R4:135,L4:45}, delay:300 },
+    { servos:{R3:45,L3:135,R4:45,L4:135}, delay:300 }, { servos:{R3:135,L3:45,R4:135,L4:45}, delay:300 },
+    { servos:{R3:45,L3:135,R4:45,L4:135}, delay:300 }, { servos:{R3:135,L3:45,R4:135,L4:45}, delay:300 },
+    { servos:{R3:45,L3:135,R4:45,L4:135}, delay:300 }, { servos:{R3:135,L3:45,R4:135,L4:45}, delay:300 },
+    { servos:{R3:45,L3:135,R4:45,L4:135}, delay:300 }, { servos:{R3:135,L3:45,R4:135,L4:45}, delay:300 },
+    { face:'stand', mode:'once', servos:STAND, delay:0 },
   ],
   shake: [
-    { face:'shake', mode:'once', servos:{R1:135,L1:45,L3:90,R3:90,L2:90,R2:90,...STAND}, delay:200 },
-    { servos:{R4:45,L4:135}, delay:300 },{ servos:{R4:0,L4:180}, delay:300 },
-    { servos:{R4:45,L4:135}, delay:300 },{ servos:{R4:0,L4:180}, delay:300 },
-    { servos:{R4:45,L4:135}, delay:300 },{ servos:{R4:0,L4:180}, delay:300 },
-    { servos:{R4:45,L4:135}, delay:300 },{ servos:{R4:0,L4:180}, delay:300 },
-    { servos:{R4:45,L4:135}, delay:300 },{ servos:{R4:0,L4:180}, delay:300 },
-    { face:'stand', mode:'once', servos:STAND, delay:0 }
+    { face:'shake', mode:'once',
+      servos:{...STAND, R1:135,L1:45,L3:90,R3:90,L2:90,R2:90}, delay:200 },
+    { servos:{R4:45,L4:135}, delay:300 }, { servos:{R4:0,L4:180}, delay:300 },
+    { servos:{R4:45,L4:135}, delay:300 }, { servos:{R4:0,L4:180}, delay:300 },
+    { servos:{R4:45,L4:135}, delay:300 }, { servos:{R4:0,L4:180}, delay:300 },
+    { servos:{R4:45,L4:135}, delay:300 }, { servos:{R4:0,L4:180}, delay:300 },
+    { servos:{R4:45,L4:135}, delay:300 }, { servos:{R4:0,L4:180}, delay:300 },
+    { face:'stand', mode:'once', servos:STAND, delay:0 },
   ],
   shrug: [
     { servos:STAND, delay:200 },
-    { face:'dead', mode:'once', servos:{R3:90,R4:90,L3:90,L4:90}, delay:1000 },
-    { face:'shrug', mode:'once', servos:{R3:0,R4:180,L3:180,L4:0}, delay:1500 },
-    { face:'stand', mode:'once', servos:STAND, delay:0 }
+    { face:'dead', mode:'once', servos:{...STAND,R3:90,R4:90,L3:90,L4:90}, delay:1000 },
+    { face:'shrug', mode:'once', servos:{...STAND,R3:0,R4:180,L3:180,L4:0}, delay:1500 },
+    { face:'stand', mode:'once', servos:STAND, delay:0 },
   ],
   dead: [
     { servos:STAND, delay:200 },
-    { face:'dead', mode:'boomerang', servos:{R3:90,R4:90,L3:90,L4:90}, delay:0 }
+    { face:'dead', mode:'boomerang', servos:{...STAND,R3:90,R4:90,L3:90,L4:90}, delay:0 },
   ],
   crab: [
-    { face:'crab', mode:'once', servos:{...STAND,R1:90,R2:90,L1:90,L2:90,R4:0,R3:180,L3:45,L4:135}, delay:200 },
-    { servos:{R4:45,R3:135,L3:0,L4:180}, delay:300 },
-    { servos:{R4:0,R3:180,L3:45,L4:135}, delay:300 },
-    { servos:{R4:45,R3:135,L3:0,L4:180}, delay:300 },
-    { servos:{R4:0,R3:180,L3:45,L4:135}, delay:300 },
-    { servos:{R4:45,R3:135,L3:0,L4:180}, delay:300 },
-    { servos:{R4:0,R3:180,L3:45,L4:135}, delay:300 },
-    { servos:{R4:45,R3:135,L3:0,L4:180}, delay:300 },
-    { servos:{R4:0,R3:180,L3:45,L4:135}, delay:300 },
-    { servos:{R4:45,R3:135,L3:0,L4:180}, delay:300 },
-    { servos:{R4:0,R3:180,L3:45,L4:135}, delay:300 },
-    { face:'stand', mode:'once', servos:STAND, delay:0 }
+    { face:'crab', mode:'once',
+      servos:{...STAND,R1:90,R2:90,L1:90,L2:90,R4:0,R3:180,L3:45,L4:135}, delay:200 },
+    { servos:{R4:45,R3:135,L3:0,L4:180},  delay:300 }, { servos:{R4:0,R3:180,L3:45,L4:135}, delay:300 },
+    { servos:{R4:45,R3:135,L3:0,L4:180},  delay:300 }, { servos:{R4:0,R3:180,L3:45,L4:135}, delay:300 },
+    { servos:{R4:45,R3:135,L3:0,L4:180},  delay:300 }, { servos:{R4:0,R3:180,L3:45,L4:135}, delay:300 },
+    { servos:{R4:45,R3:135,L3:0,L4:180},  delay:300 }, { servos:{R4:0,R3:180,L3:45,L4:135}, delay:300 },
+    { servos:{R4:45,R3:135,L3:0,L4:180},  delay:300 }, { servos:{R4:0,R3:180,L3:45,L4:135}, delay:300 },
+    { face:'stand', mode:'once', servos:STAND, delay:0 },
   ],
   forward: [
     { face:'walk', mode:'once', delay:0 },
     { servos:{R3:135,L3:45,R2:100,L1:25}, delay:FD },
-    // cycle × 2
     { servos:{R3:135,L3:0}, delay:FD },
     { servos:{L4:135,L2:90,R4:0,R1:180}, delay:FD },
-    { servos:{R2:45,L1:90}, delay:FD },
+    { servos:{R2:45,L1:90},  delay:FD },
     { servos:{R4:45,L4:180}, delay:FD },
     { servos:{R3:180,L3:45,R2:90,L1:0}, delay:FD },
     { servos:{L2:135,R1:90}, delay:FD },
     { servos:{R3:135,L3:0}, delay:FD },
     { servos:{L4:135,L2:90,R4:0,R1:180}, delay:FD },
-    { servos:{R2:45,L1:90}, delay:FD },
+    { servos:{R2:45,L1:90},  delay:FD },
     { servos:{R4:45,L4:180}, delay:FD },
     { servos:{R3:180,L3:45,R2:90,L1:0}, delay:FD },
     { servos:{L2:135,R1:90}, delay:FD },
-    { face:'stand', mode:'once', servos:STAND, delay:0 }
+    { face:'stand', mode:'once', servos:STAND, delay:0 },
   ],
   backward: [
     { face:'walk', mode:'once', delay:FD },
     { servos:{R3:135,L3:0}, delay:FD },
     { servos:{L4:135,L2:135,R4:0,R1:90}, delay:FD },
-    { servos:{R2:90,L1:0}, delay:FD },
+    { servos:{R2:90,L1:0},  delay:FD },
     { servos:{R4:45,L4:180}, delay:FD },
     { servos:{R3:180,L3:45,R2:45,L1:90}, delay:FD },
     { servos:{L2:90,R1:180}, delay:FD },
     { servos:{R3:135,L3:0}, delay:FD },
     { servos:{L4:135,L2:135,R4:0,R1:90}, delay:FD },
-    { servos:{R2:90,L1:0}, delay:FD },
+    { servos:{R2:90,L1:0},  delay:FD },
     { servos:{R4:45,L4:180}, delay:FD },
     { servos:{R3:180,L3:45,R2:45,L1:90}, delay:FD },
     { servos:{L2:90,R1:180}, delay:FD },
-    { face:'stand', mode:'once', servos:STAND, delay:0 }
+    { face:'stand', mode:'once', servos:STAND, delay:0 },
   ],
   left: [
     { face:'walk', mode:'once', delay:0 },
-    { servos:{R3:135,L4:135}, delay:FD },
-    { servos:{R1:180,L2:180}, delay:FD },
-    { servos:{R3:180,L4:180}, delay:FD },
-    { servos:{R1:135,L2:135}, delay:FD },
-    { servos:{R4:45,L3:45}, delay:FD },
-    { servos:{R2:90,L1:90}, delay:FD },
-    { servos:{R4:0,L3:0}, delay:FD },
-    { servos:{R2:45,L1:45}, delay:FD },
-    { face:'stand', mode:'once', servos:STAND, delay:0 }
+    { servos:{R3:135,L4:135}, delay:FD }, { servos:{R1:180,L2:180}, delay:FD },
+    { servos:{R3:180,L4:180}, delay:FD }, { servos:{R1:135,L2:135}, delay:FD },
+    { servos:{R4:45,L3:45},   delay:FD }, { servos:{R2:90,L1:90},   delay:FD },
+    { servos:{R4:0,L3:0},     delay:FD }, { servos:{R2:45,L1:45},   delay:FD },
+    { face:'stand', mode:'once', servos:STAND, delay:0 },
   ],
   right: [
     { face:'walk', mode:'once', delay:0 },
-    { servos:{R4:45,L3:45}, delay:FD },
-    { servos:{R2:0,L1:0}, delay:FD },
-    { servos:{R4:0,L3:0}, delay:FD },
-    { servos:{R2:45,L1:45}, delay:FD },
-    { servos:{R3:135,L4:135}, delay:FD },
-    { servos:{R1:90,L2:90}, delay:FD },
-    { servos:{R3:180,L4:180}, delay:FD },
-    { servos:{R1:135,L2:135}, delay:FD },
-    { face:'stand', mode:'once', servos:STAND, delay:0 }
+    { servos:{R4:45,L3:45},   delay:FD }, { servos:{R2:0,L1:0},     delay:FD },
+    { servos:{R4:0,L3:0},     delay:FD }, { servos:{R2:45,L1:45},   delay:FD },
+    { servos:{R3:135,L4:135}, delay:FD }, { servos:{R1:90,L2:90},   delay:FD },
+    { servos:{R3:180,L4:180}, delay:FD }, { servos:{R1:135,L2:135}, delay:FD },
+    { face:'stand', mode:'once', servos:STAND, delay:0 },
   ],
 };
 
-// ─────────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
 // STATE
-// ─────────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
 let state = {
   servos: {R1:90,R2:90,L1:90,L2:90,R4:90,R3:90,L3:90,L4:90},
-  face: 'idle',
-  faceMode: 'loop',
-  faceFrameIdx: 0,
-  faceFrameTimer: null,
-  faceDir: 1,
-  animTimer: null,
-  animStepIdx: 0,
-  animName: null,
-  speed: 1.0,
+  face:'idle', faceMode:'loop', faceFrameIdx:0, faceDir:1,
+  faceFrameTimer:null, animTimer:null, animName:null, speed:1.0,
 };
 
-// ─────────────────────────────────────────────────────────────────────
-// OLED RENDERER
-// ─────────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// OLED
+// ─────────────────────────────────────────────────────────────────────────────
 const oledCanvas = document.getElementById('oled');
-const oledCtx = oledCanvas.getContext('2d');
-const SCALE = 3;
+const oledCtx    = oledCanvas.getContext('2d');
 
 function renderFaceBitmap(name) {
-  const key = 'epd_bitmap_' + name;
-  const data = BITMAPS[key];
+  const data = BITMAPS['epd_bitmap_' + name];
   oledCtx.fillStyle = '#000';
   oledCtx.fillRect(0, 0, 384, 192);
-  if (!data || data.length < 1024) {
-    // No bitmap — draw blank screen with subtle border glow
-    return;
-  }
-  const imgData = oledCtx.createImageData(384, 192);
-  const d = imgData.data;
+  if (!data || data.length < 1024) return;
+  const img = oledCtx.createImageData(384, 192);
+  const d = img.data;
   for (let y = 0; y < 64; y++) {
     for (let x = 0; x < 128; x++) {
-      const byteIdx = y * 16 + (x >> 3);
-      const bit = (data[byteIdx] >> (7 - (x & 7))) & 1;
-      for (let sy = 0; sy < SCALE; sy++) {
-        for (let sx = 0; sx < SCALE; sx++) {
-          const i = ((y*SCALE+sy)*384 + (x*SCALE+sx)) * 4;
-          if (bit) {
-            d[i]=0; d[i+1]=232; d[i+2]=0; d[i+3]=255;
-          } else {
-            d[i]=0; d[i+1]=8; d[i+2]=0; d[i+3]=255;
-          }
-        }
+      const bit = (data[y*16 + (x>>3)] >> (7-(x&7))) & 1;
+      for (let sy = 0; sy < 3; sy++) for (let sx = 0; sx < 3; sx++) {
+        const i = ((y*3+sy)*384 + (x*3+sx)) * 4;
+        d[i]=0; d[i+1]=bit?224:8; d[i+2]=0; d[i+3]=255;
       }
     }
   }
-  oledCtx.putImageData(imgData, 0, 0);
+  oledCtx.putImageData(img, 0, 0);
 }
 
-// ─────────────────────────────────────────────────────────────────────
-// FACE ANIMATOR
-// ─────────────────────────────────────────────────────────────────────
 function setFace(name, mode) {
   clearTimeout(state.faceFrameTimer);
-  state.face = name;
-  state.faceMode = mode || 'loop';
-  state.faceFrameIdx = 0;
-  state.faceDir = 1;
+  state.face = name; state.faceMode = mode||'loop';
+  state.faceFrameIdx = 0; state.faceDir = 1;
   document.getElementById('face-label').textContent = name;
-  renderCurrentFaceFrame();
-  scheduleFaceFrame();
+  _renderFaceFrame(); _scheduleFaceFrame();
 }
 
-function renderCurrentFaceFrame() {
+function _renderFaceFrame() {
   const frames = FACE_FRAMES[state.face] || [];
-  const frameName = frames[state.faceFrameIdx] || null;
-  if (frameName) {
-    const short = frameName.replace('epd_bitmap_', '');
-    renderFaceBitmap(short);
-  } else {
-    // blank
-    oledCtx.fillStyle = '#000';
-    oledCtx.fillRect(0,0,384,192);
-  }
+  const f = frames[state.faceFrameIdx];
+  if (f) renderFaceBitmap(f.replace('epd_bitmap_',''));
+  else { oledCtx.fillStyle='#000'; oledCtx.fillRect(0,0,384,192); }
 }
 
-function scheduleFaceFrame() {
+function _scheduleFaceFrame() {
   const frames = FACE_FRAMES[state.face] || [];
   if (frames.length <= 1) return;
   const fps = FACE_FPS[state.face] || 1;
-  state.faceFrameTimer = setTimeout(() => {
-    advanceFaceFrame();
-    scheduleFaceFrame();
-  }, 1000 / fps);
+  state.faceFrameTimer = setTimeout(() => { _advanceFaceFrame(); _scheduleFaceFrame(); }, 1000/fps);
 }
 
-function advanceFaceFrame() {
+function _advanceFaceFrame() {
   const frames = FACE_FRAMES[state.face] || [];
   if (frames.length <= 1) return;
   const mode = state.faceMode;
@@ -509,168 +549,322 @@ function advanceFaceFrame() {
     state.faceFrameIdx = (state.faceFrameIdx + 1) % frames.length;
   } else if (mode === 'once') {
     state.faceFrameIdx = Math.min(state.faceFrameIdx + 1, frames.length - 1);
-  } else { // boomerang
+  } else {
     state.faceFrameIdx += state.faceDir;
-    if (state.faceFrameIdx >= frames.length - 1) {
-      state.faceFrameIdx = frames.length - 1;
-      state.faceDir = -1;
-    } else if (state.faceFrameIdx <= 0) {
-      state.faceFrameIdx = 0;
-      state.faceDir = 1;
-    }
+    if (state.faceFrameIdx >= frames.length-1) { state.faceFrameIdx = frames.length-1; state.faceDir = -1; }
+    else if (state.faceFrameIdx <= 0)          { state.faceFrameIdx = 0;               state.faceDir =  1; }
   }
-  renderCurrentFaceFrame();
+  _renderFaceFrame();
 }
 
-// ─────────────────────────────────────────────────────────────────────
-// ROBOT DIAGRAM
-// ─────────────────────────────────────────────────────────────────────
-const robotCanvas = document.getElementById('robot');
-const robotCtx = robotCanvas.getContext('2d');
-const W = 340, H = 280;
+// ─────────────────────────────────────────────────────────────────────────────
+// 3D ISOMETRIC ROBOT RENDERER
+// ─────────────────────────────────────────────────────────────────────────────
+const RC   = document.getElementById('robot');
+const RCTX = RC.getContext('2d');
+const CW = 500, CH = 340;
 
-function drawRobot() {
-  const ctx = robotCtx;
-  ctx.clearRect(0,0,W,H);
+// Isometric projection constants
+// X = right, Y = forward (front of robot), Z = up, floor at Z=0
+const ISO_A   = Math.PI / 6;   // 30°
+const ISO_COS = Math.cos(ISO_A);
+const ISO_SIN = Math.sin(ISO_A);
+const ISO_SCALE = 1.05;         // px per world-unit (mm)
 
-  // Background
-  ctx.fillStyle = '#0e0e18';
-  ctx.fillRect(0,0,W,H);
+// Canvas origin (screen centre for the world origin)
+const OX = 250, OY = 182;
 
-  // Grid dots
-  ctx.fillStyle = '#1a1a28';
-  for(let x=20;x<W;x+=20) for(let y=20;y<H;y+=20) {
-    ctx.beginPath(); ctx.arc(x,y,1,0,6.28); ctx.fill();
-  }
-
-  const cx = W/2, cy = H/2;
-  const BW = 100, BH = 70;
-  const HIP = 52, KNEE = 44;
-
-  // Legs: {corner, outDir, hipServo, kneeServo, label}
-  const legs = [
-    { cx:cx+BW/2, cy:cy-BH/2, dir:-Math.PI*0.35, hip:'R1', knee:'R2', label:'FR' },
-    { cx:cx-BW/2, cy:cy-BH/2, dir:-Math.PI*0.65, hip:'L1', knee:'L2', label:'FL' },
-    { cx:cx+BW/2, cy:cy+BH/2, dir: Math.PI*0.35, hip:'R4', knee:'R3', label:'BR' },
-    { cx:cx-BW/2, cy:cy+BH/2, dir: Math.PI*0.65, hip:'L4', knee:'L3', label:'BL' },
+function iso(wx, wy, wz) {
+  return [
+    OX + (wx - wy) * ISO_COS * ISO_SCALE,
+    OY + ((wx + wy) * ISO_SIN - wz) * ISO_SCALE,
   ];
+}
 
+// Rotate a direction vector around the world Y axis
+function rotY(v, a) {
+  const c = Math.cos(a), s = Math.sin(a);
+  return [v[0]*c + v[2]*s, v[1], -v[0]*s + v[2]*c];
+}
+
+// ── Robot geometry (mm) ──────────────────────────────────────────────────────
+// Body centre in world space — height chosen so feet are at Z≈0 in stand pose
+const BDY = { cx:0, cy:0, cz:82, w:58, d:86, h:20 };
+
+// Neutral upper-leg direction at servo=90° (outward & slightly down)
+// normalize(1, 0, -0.5) ≈ (0.894, 0, -0.447)
+const N0 = [0.894, 0, -0.447];   // right-side neutral
+const N0L= [-0.894, 0, -0.447];  // left-side neutral (mirror X)
+
+const UPP = 40, LOW = 38;  // segment lengths (mm)
+
+// Leg definitions
+// hipFn/kneeFn: servo value → rotation angle in radians
+// Front legs: servo 45–135 maps to ≈ ±45° physical swing
+// Back legs: servo 0–180 maps to ≈ ±45° physical swing (half-scale)
+const LEGS = [
+  { name:'FR', hs:'R1', ks:'R2', mount:[ 28, 42, -8], dir0: N0,
+    hipFn:  v => (v - 90) * (Math.PI/180),
+    kneeFn: v => -(v - 90) * (Math.PI/180) },
+  { name:'FL', hs:'L1', ks:'L2', mount:[-28, 42, -8], dir0: N0L,
+    hipFn:  v => -(v - 90) * (Math.PI/180),
+    kneeFn: v =>  (v - 90) * (Math.PI/180) },
+  { name:'BR', hs:'R4', ks:'R3', mount:[ 28,-42, -8], dir0: N0,
+    hipFn:  v => -(v - 90) * (Math.PI/360),
+    kneeFn: v =>  (v - 90) * (Math.PI/360) },
+  { name:'BL', hs:'L4', ks:'L3', mount:[-28,-42, -8], dir0: N0L,
+    hipFn:  v =>  (v - 90) * (Math.PI/360),
+    kneeFn: v => -(v - 90) * (Math.PI/360) },
+];
+
+function computeLeg(leg) {
+  const hv = state.servos[leg.hs], kv = state.servos[leg.ks];
+  const hipA = leg.hipFn(hv), kneeA = leg.kneeFn(kv);
+
+  // Hip joint world position
+  const hx = BDY.cx + leg.mount[0];
+  const hy = BDY.cy + leg.mount[1];
+  const hz = BDY.cz + leg.mount[2];
+
+  // Upper-leg direction after hip rotation
+  const ud = rotY(leg.dir0, hipA);
+
+  // Knee joint
+  const kx = hx + ud[0]*UPP, ky = hy + ud[1]*UPP, kz = hz + ud[2]*UPP;
+
+  // Lower-leg direction (knee bends relative to upper segment, same axis)
+  const ld = rotY(ud, kneeA);
+
+  // Foot
+  const fx = kx + ld[0]*LOW, fy = ky + ld[1]*LOW, fz = kz + ld[2]*LOW;
+
+  return {
+    hip:[hx,hy,hz], knee:[kx,ky,kz], foot:[fx,fy,fz],
+    grounded: fz <= 6,
+  };
+}
+
+// ── Drawing helpers ──────────────────────────────────────────────────────────
+function line(p1, p2, col, w) {
+  RCTX.strokeStyle = col; RCTX.lineWidth = w; RCTX.lineCap = 'round';
+  RCTX.beginPath(); RCTX.moveTo(...p1); RCTX.lineTo(...p2); RCTX.stroke();
+}
+
+function circle(p, r, fill, stroke, sw) {
+  RCTX.beginPath(); RCTX.arc(p[0], p[1], r, 0, 6.2832);
+  if (fill)  { RCTX.fillStyle   = fill;   RCTX.fill(); }
+  if (stroke){ RCTX.strokeStyle = stroke; RCTX.lineWidth = sw||1.5; RCTX.stroke(); }
+}
+
+function poly(pts, fill, stroke, sw) {
+  RCTX.beginPath(); RCTX.moveTo(...pts[0]);
+  for (let i=1;i<pts.length;i++) RCTX.lineTo(...pts[i]);
+  RCTX.closePath();
+  if (fill)  { RCTX.fillStyle   = fill;   RCTX.fill(); }
+  if (stroke){ RCTX.strokeStyle = stroke; RCTX.lineWidth = sw||1; RCTX.stroke(); }
+}
+
+// ── Main draw function ───────────────────────────────────────────────────────
+function drawRobot() {
+  RCTX.clearRect(0, 0, CW, CH);
+
+  // ── background ──────────────────────────────────────────────────────────
+  RCTX.fillStyle = '#080810';
+  RCTX.fillRect(0, 0, CW, CH);
+
+  // ── compute all legs first ───────────────────────────────────────────────
+  const legs = LEGS.map(computeLeg);
+
+  // ── floor ───────────────────────────────────────────────────────────────
+  const GS = 22, GR = 110; // grid spacing, grid radius
+
+  // Floor fill
+  const fc = [iso(-GR,-GR,0), iso(GR,-GR,0), iso(GR,GR,0), iso(-GR,GR,0)];
+  poly(fc, '#080f08');
+
+  // Grid lines
+  RCTX.globalAlpha = 0.55;
+  for (let v = -GR; v <= GR; v += GS) {
+    // Lines along X (constant Y)
+    line(iso(-GR, v, 0), iso(GR, v, 0), '#1a2e1a', 0.7);
+    // Lines along Y (constant X)
+    line(iso(v, -GR, 0), iso(v,  GR, 0), '#1a2e1a', 0.7);
+  }
+  RCTX.globalAlpha = 1;
+
+  // Floor border
+  poly(fc, null, '#1e321e', 1.2);
+
+  // ── foot shadows on floor (all feet, under grounded ones especially) ─────
   legs.forEach(leg => {
-    const hv = state.servos[leg.hip];
-    const kv = state.servos[leg.knee];
-    // Map servo 0-180 → ±70° around base direction
-    const hipDir  = leg.dir + (hv - 90) * (Math.PI * 0.78 / 90);
-    const kDir    = hipDir  + (kv - 90) * (Math.PI * 0.55 / 90);
+    const [fx, fy, fz] = leg.foot;
+    const sp = iso(fx, fy, 0); // shadow point on floor
 
-    const hx = leg.cx + Math.cos(hipDir) * HIP;
-    const hy = leg.cy + Math.sin(hipDir) * HIP;
-    const fx = hx + Math.cos(kDir) * KNEE;
-    const fy = hy + Math.sin(kDir) * KNEE;
-
-    // Shadow
-    ctx.strokeStyle = 'rgba(0,0,0,0.4)';
-    ctx.lineWidth = 9; ctx.lineCap = 'round';
-    ctx.beginPath(); ctx.moveTo(leg.cx+2,leg.cy+2); ctx.lineTo(hx+2,hy+2); ctx.stroke();
-    ctx.lineWidth = 6;
-    ctx.beginPath(); ctx.moveTo(hx+2,hy+2); ctx.lineTo(fx+2,fy+2); ctx.stroke();
-
-    // Hip segment
-    ctx.strokeStyle = '#c0c0d0';
-    ctx.lineWidth = 7; ctx.lineCap = 'round';
-    ctx.beginPath(); ctx.moveTo(leg.cx,leg.cy); ctx.lineTo(hx,hy); ctx.stroke();
-
-    // Knee segment
-    ctx.strokeStyle = '#8080a0';
-    ctx.lineWidth = 5;
-    ctx.beginPath(); ctx.moveTo(hx,hy); ctx.lineTo(fx,fy); ctx.stroke();
-
-    // Shoulder joint
-    ctx.fillStyle = '#ff8c42';
-    ctx.beginPath(); ctx.arc(leg.cx,leg.cy,6,0,6.28); ctx.fill();
-
-    // Elbow joint
-    ctx.fillStyle = '#e06030';
-    ctx.beginPath(); ctx.arc(hx,hy,4,0,6.28); ctx.fill();
-
-    // Foot
-    ctx.fillStyle = '#6060a0';
-    ctx.beginPath(); ctx.arc(fx,fy,3,0,6.28); ctx.fill();
-
-    // Angle arcs at shoulder
-    ctx.strokeStyle = 'rgba(255,140,66,0.25)';
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.arc(leg.cx, leg.cy, 16, leg.dir - Math.PI*0.78, leg.dir + Math.PI*0.78);
-    ctx.stroke();
-
-    // Leg label + angles
-    const lx = leg.cx + Math.cos(leg.dir) * (HIP + KNEE + 18);
-    const ly = leg.cy + Math.sin(leg.dir) * (HIP + KNEE + 18);
-    ctx.font = 'bold 10px monospace';
-    ctx.textAlign = 'center';
-    ctx.fillStyle = '#ff8c42';
-    ctx.fillText(leg.label, lx, ly - 8);
-    ctx.font = '9px monospace';
-    ctx.fillStyle = '#999';
-    ctx.fillText(`${leg.hip}:${hv}°`, lx, ly + 3);
-    ctx.fillText(`${leg.knee}:${kv}°`, lx, ly + 13);
+    if (leg.grounded) {
+      // Bright contact ring
+      RCTX.globalAlpha = 0.6;
+      circle(sp, 10, null, '#ff8c42', 1.5);
+      RCTX.globalAlpha = 0.18;
+      circle(sp, 14, '#ff8c42');
+      RCTX.globalAlpha = 1;
+      // Tick mark: vertical stroke from foot to floor
+      const fp = iso(fx, fy, Math.max(fz, 0));
+      line(fp, sp, 'rgba(255,140,66,0.35)', 1);
+    } else {
+      // Faint grey shadow proportional to height
+      const alpha = Math.max(0, 0.25 - fz * 0.002);
+      RCTX.globalAlpha = alpha;
+      circle(sp, 5, '#aaaacc');
+      RCTX.globalAlpha = 1;
+    }
   });
 
-  // Body
-  ctx.fillStyle = '#ff8c42';
-  ctx.strokeStyle = '#e06020';
-  ctx.lineWidth = 2;
-  const r = 10;
-  ctx.beginPath();
-  ctx.roundRect(cx-BW/2, cy-BH/2, BW, BH, r);
-  ctx.fill(); ctx.stroke();
+  // ── draw BACK legs (BR index=2, BL index=3) — behind body ───────────────
+  [3, 2].forEach(i => _drawLeg(legs[i], LEGS[i].name, true));
+
+  // ── body box ─────────────────────────────────────────────────────────────
+  const {cx, cy, cz, w, d, h} = BDY;
+  // 8 corners
+  const C = [
+    iso(cx-w/2, cy-d/2, cz-h/2), iso(cx+w/2, cy-d/2, cz-h/2),  // 0,1 bottom-front
+    iso(cx+w/2, cy+d/2, cz-h/2), iso(cx-w/2, cy+d/2, cz-h/2),  // 2,3 bottom-back
+    iso(cx-w/2, cy-d/2, cz+h/2), iso(cx+w/2, cy-d/2, cz+h/2),  // 4,5 top-front
+    iso(cx+w/2, cy+d/2, cz+h/2), iso(cx-w/2, cy+d/2, cz+h/2),  // 6,7 top-back
+  ];
+
+  // Right side face (x+): corners 1,2,6,5  — medium shade
+  poly([C[1],C[2],C[6],C[5]], '#b35a18', '#8a4010', 1);
+  // Front face (y-): corners 0,1,5,4  — medium-light shade
+  poly([C[0],C[1],C[5],C[4]], '#d06820', '#a04c10', 1);
+  // Top face (z+): corners 4,5,6,7  — brightest
+  poly([C[4],C[5],C[6],C[7]], '#ff8c42', '#cc6020', 1.5);
 
   // Body labels
-  ctx.fillStyle = '#1a1a2e';
-  ctx.font = 'bold 10px monospace';
-  ctx.textAlign = 'center';
-  ctx.fillText('▲ FRONT', cx, cy - BH/2 + 14);
-  ctx.fillText('▼ BACK', cx, cy + BH/2 - 5);
-  ctx.font = '9px monospace';
-  ctx.fillStyle = 'rgba(26,26,46,0.8)';
-  ctx.fillText('SESAME', cx, cy + 5);
+  RCTX.font = 'bold 9px monospace';
+  RCTX.textAlign = 'center';
+  // "FRONT" on front face
+  const frontMid = iso(cx, cy-d/2, cz+2);
+  RCTX.fillStyle = 'rgba(20,10,0,0.7)';
+  RCTX.fillText('▲ FRONT', frontMid[0], frontMid[1]+3);
+  // "BACK" on top face back edge
+  const backMid  = iso(cx, cy+d/2, cz+h/2+1);
+  RCTX.fillStyle = 'rgba(20,10,0,0.55)';
+  RCTX.fillText('▼ BACK', backMid[0], backMid[1]+2);
+
+  // ── draw FRONT legs (FL index=1, FR index=0) — in front of body ──────────
+  [1, 0].forEach(i => _drawLeg(legs[i], LEGS[i].name, false));
+
+  // ── axes legend (small, bottom-right corner) ─────────────────────────────
+  _drawAxes();
 }
 
-// ─────────────────────────────────────────────────────────────────────
+function _drawLeg(leg, name, isBack) {
+  const hip  = iso(...leg.hip);
+  const knee = iso(...leg.knee);
+  const foot = iso(...leg.foot);
+
+  const alpha = isBack ? 0.72 : 1.0;
+  RCTX.globalAlpha = alpha;
+
+  // Upper segment shadow
+  RCTX.globalAlpha = alpha * 0.25;
+  line(hip, knee, '#000', 9);
+  RCTX.globalAlpha = alpha;
+
+  // Upper segment
+  line(hip, knee, '#b8b8cc', 6.5);
+  // Specular highlight
+  RCTX.globalAlpha = alpha * 0.4;
+  line(hip, knee, '#ddddf0', 2);
+  RCTX.globalAlpha = alpha;
+
+  // Lower segment shadow
+  RCTX.globalAlpha = alpha * 0.2;
+  line(knee, foot, '#000', 7);
+  RCTX.globalAlpha = alpha;
+
+  // Lower segment
+  line(knee, foot, '#7878a0', 5);
+
+  // Hip joint (body attachment)
+  circle(hip, 7, '#ff8c42', '#cc5010', 1.5);
+  // Knee joint
+  circle(knee, 4.5, '#dd6820', '#aa4010', 1.2);
+  // Foot
+  if (leg.grounded) {
+    circle(foot, 5, '#ff8c42', '#ffaa60', 1.5);
+  } else {
+    circle(foot, 3.5, '#50506a', '#707090', 1);
+  }
+
+  // Leg name tag near foot
+  const [fx, fy, fz] = leg.foot;
+  const tagOffset = fz > 20 ? -14 : 12; // above foot if it's in air
+  RCTX.globalAlpha = alpha * 0.7;
+  RCTX.font = '8px monospace';
+  RCTX.textAlign = 'center';
+  RCTX.fillStyle = '#aa8860';
+  RCTX.fillText(name, foot[0], foot[1] + tagOffset);
+
+  RCTX.globalAlpha = 1;
+}
+
+function _drawAxes() {
+  // Small axis indicator bottom-right
+  const ax = CW - 46, ay = CH - 34;
+  const len = 18;
+  const o = [ax, ay];
+  const xEnd = iso(len, 0, 0), yEnd = iso(0, len, 0), zEnd = iso(0, 0, len);
+  // Compute offsets from world origin
+  const orig = iso(0,0,0);
+  const dx = xEnd[0]-orig[0], dy_x = xEnd[1]-orig[1];
+  const dx2 = yEnd[0]-orig[0], dy2 = yEnd[1]-orig[1];
+  const dx3 = zEnd[0]-orig[0], dy3 = zEnd[1]-orig[1];
+
+  RCTX.globalAlpha = 0.55;
+  line([ax, ay], [ax+dx, ay+dy_x], '#e05030', 1.5);   // X → right
+  line([ax, ay], [ax+dx2,ay+dy2],  '#30a050', 1.5);   // Y → forward
+  line([ax, ay], [ax+dx3,ay+dy3],  '#4080e0', 1.5);   // Z → up
+  RCTX.font = '8px monospace'; RCTX.textAlign = 'left';
+  RCTX.fillStyle = '#e05030'; RCTX.fillText('X', ax+dx+2,  ay+dy_x+4);
+  RCTX.fillStyle = '#30a050'; RCTX.fillText('Y', ax+dx2+2, ay+dy2+4);
+  RCTX.fillStyle = '#4080e0'; RCTX.fillText('Z', ax+dx3+2, ay+dy3+4);
+  RCTX.globalAlpha = 1;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // SERVO PANEL
-// ─────────────────────────────────────────────────────────────────────
-const SERVO_ORDER = ['R1','R2','L1','L2','R4','R3','L4','L3'];
-const SERVO_LABELS = { R1:'R1 Hip FR',R2:'R2 Knee FR',L1:'L1 Hip FL',L2:'L2 Knee FL',R4:'R4 Hip BR',R3:'R3 Knee BR',L4:'L4 Hip BL',L3:'L3 Knee BL' };
+// ─────────────────────────────────────────────────────────────────────────────
+const SERVO_ORDER  = ['R1','R2','L1','L2','R4','R3','L4','L3'];
+const SERVO_GROUPS = {
+  R1:'FR hip', R2:'FR knee', L1:'FL hip', L2:'FL knee',
+  R4:'BR hip', R3:'BR knee', L4:'BL hip', L3:'BL knee',
+};
 
 function buildServoPanel() {
   const el = document.getElementById('servo-panel');
-  SERVO_ORDER.forEach(name => {
+  SERVO_ORDER.forEach(n => {
     const row = document.createElement('div');
     row.className = 'servo-row';
     row.innerHTML = `
-      <span class="servo-name" title="${SERVO_LABELS[name]}">${name}</span>
-      <input class="servo-slider" type="range" min="0" max="180" value="${state.servos[name]}"
-             id="sv-${name}" data-servo="${name}">
-      <span class="servo-val" id="sv-val-${name}">${state.servos[name]}°</span>
-    `;
+      <span class="sname" title="${SERVO_GROUPS[n]}">${n}</span>
+      <input class="sslider" type="range" min="0" max="180" value="${state.servos[n]}"
+             id="sv-${n}" data-s="${n}">
+      <span class="sval" id="sv-val-${n}">${state.servos[n]}°</span>`;
     el.appendChild(row);
   });
   el.addEventListener('input', e => {
-    if (e.target.classList.contains('servo-slider')) {
-      const name = e.target.dataset.servo;
-      const val = parseInt(e.target.value);
-      stopAnim();
-      setServo(name, val);
-    }
+    if (!e.target.classList.contains('sslider')) return;
+    stopAnim();
+    setServo(e.target.dataset.s, +e.target.value);
   });
 }
 
-function setServo(name, angle) {
-  state.servos[name] = angle;
-  const sl = document.getElementById('sv-'+name);
-  const vl = document.getElementById('sv-val-'+name);
-  if(sl) sl.value = angle;
-  if(vl) vl.textContent = angle + '°';
+function setServo(n, v) {
+  state.servos[n] = v;
+  const sl = document.getElementById('sv-'+n), vl = document.getElementById('sv-val-'+n);
+  if (sl) sl.value = v;
+  if (vl) vl.textContent = v + '°';
   drawRobot();
 }
 
@@ -679,23 +873,12 @@ function setServos(obj) {
   Object.entries(obj).forEach(([k,v]) => setServo(k, v));
 }
 
-function syncServoPanelFromState() {
-  SERVO_ORDER.forEach(name => {
-    const sl = document.getElementById('sv-'+name);
-    const vl = document.getElementById('sv-val-'+name);
-    if(sl) sl.value = state.servos[name];
-    if(vl) vl.textContent = state.servos[name] + '°';
-  });
-  drawRobot();
-}
-
-// ─────────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
 // ANIMATION PLAYER
-// ─────────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
 function stopAnim() {
   clearTimeout(state.animTimer);
-  state.animTimer = null;
-  state.animName = null;
+  state.animTimer = null; state.animName = null;
   document.querySelectorAll('.cmd-btn.active').forEach(b => b.classList.remove('active'));
 }
 
@@ -705,119 +888,95 @@ function playAnim(name) {
   if (!seq) return;
   state.animName = name;
   state.animStepIdx = 0;
-  document.querySelectorAll('.cmd-btn').forEach(b => b.classList.remove('active'));
   document.querySelectorAll(`.cmd-btn[data-cmd="${name}"]`).forEach(b => b.classList.add('active'));
-  clearStepLog();
+  clearLog();
   runStep(seq);
 }
 
 function runStep(seq) {
-  if (state.animStepIdx >= seq.length) {
-    stopAnim();
-    logStep('✓ done');
-    return;
-  }
+  if (state.animStepIdx >= seq.length) { stopAnim(); logLine('✓ done'); return; }
   const step = seq[state.animStepIdx++];
-  logStep(`step ${state.animStepIdx}: ${describeStep(step)}`);
-
-  if (step.face) setFace(step.face, step.mode || 'loop');
+  logLine(`${state.animStepIdx}. ${descStep(step)}`);
+  if (step.face)   setFace(step.face, step.mode || 'loop');
   if (step.servos) setServos(step.servos);
-
-  const delay = (step.delay || 0) / state.speed;
-  if (delay > 0) {
-    state.animTimer = setTimeout(() => runStep(seq), delay);
-  } else {
-    runStep(seq);
-  }
+  const ms = (step.delay || 0) / state.speed;
+  if (ms > 0) state.animTimer = setTimeout(() => runStep(seq), ms);
+  else runStep(seq);
 }
 
-function describeStep(step) {
-  const parts = [];
-  if (step.face) parts.push(`face:${step.face}`);
-  if (step.servos) {
-    const sv = Object.entries(step.servos).map(([k,v])=>`${k}=${v}`).join(' ');
-    parts.push(sv);
-  }
-  if (step.delay) parts.push(`⏱${step.delay}ms`);
-  return parts.join(' | ') || '(no-op)';
+function descStep(s) {
+  const p = [];
+  if (s.face)   p.push('face:' + s.face);
+  if (s.servos) p.push(Object.entries(s.servos).map(([k,v])=>`${k}=${v}`).join(' '));
+  if (s.delay)  p.push(`${s.delay}ms`);
+  return p.join('  ') || '—';
 }
 
-// ─────────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
 // COMMAND BUTTONS
-// ─────────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
 const COMMANDS = [
-  { cmd:'rest', label:'😴 Rest' },
-  { cmd:'stand', label:'🧍 Stand' },
-  { cmd:'forward', label:'⬆️ Walk' },
-  { cmd:'backward', label:'⬇️ Back' },
-  { cmd:'left', label:'↩️ Left' },
-  { cmd:'right', label:'↪️ Right' },
-  { cmd:'wave', label:'👋 Wave' },
-  { cmd:'dance', label:'💃 Dance' },
-  { cmd:'swim', label:'🏊 Swim' },
-  { cmd:'point', label:'👉 Point' },
-  { cmd:'pushup', label:'💪 Pushup' },
-  { cmd:'bow', label:'🙇 Bow' },
-  { cmd:'cute', label:'🥰 Cute' },
-  { cmd:'freaky', label:'😱 Freaky' },
-  { cmd:'worm', label:'🐛 Worm' },
-  { cmd:'shake', label:'🫨 Shake' },
-  { cmd:'shrug', label:'🤷 Shrug' },
-  { cmd:'dead', label:'💀 Dead' },
-  { cmd:'crab', label:'🦀 Crab' },
+  {cmd:'rest',     label:'😴 Rest'},
+  {cmd:'stand',    label:'🧍 Stand'},
+  {cmd:'forward',  label:'⬆ Walk'},
+  {cmd:'backward', label:'⬇ Back'},
+  {cmd:'left',     label:'↩ Left'},
+  {cmd:'right',    label:'↪ Right'},
+  {cmd:'wave',     label:'👋 Wave'},
+  {cmd:'dance',    label:'💃 Dance'},
+  {cmd:'swim',     label:'🏊 Swim'},
+  {cmd:'point',    label:'👉 Point'},
+  {cmd:'pushup',   label:'💪 Pushup'},
+  {cmd:'bow',      label:'🙇 Bow'},
+  {cmd:'cute',     label:'🥰 Cute'},
+  {cmd:'freaky',   label:'😱 Freaky'},
+  {cmd:'worm',     label:'🐛 Worm'},
+  {cmd:'shake',    label:'🫨 Shake'},
+  {cmd:'shrug',    label:'🤷 Shrug'},
+  {cmd:'dead',     label:'💀 Dead'},
+  {cmd:'crab',     label:'🦀 Crab'},
 ];
 
-function buildCommandGrid() {
+function buildCmdGrid() {
   const el = document.getElementById('cmd-grid');
   COMMANDS.forEach(c => {
     const btn = document.createElement('button');
-    btn.className = 'cmd-btn';
-    btn.dataset.cmd = c.cmd;
-    btn.textContent = c.label;
+    btn.className = 'cmd-btn'; btn.dataset.cmd = c.cmd; btn.textContent = c.label;
     btn.addEventListener('click', () => playAnim(c.cmd));
     el.appendChild(btn);
   });
 }
 
-// ─────────────────────────────────────────────────────────────────────
-// STEP LOG
-// ─────────────────────────────────────────────────────────────────────
-function logStep(msg) {
+// ─────────────────────────────────────────────────────────────────────────────
+// LOG
+// ─────────────────────────────────────────────────────────────────────────────
+function logLine(msg) {
   const log = document.getElementById('step-log');
-  // Remove 'current' class from all
-  log.querySelectorAll('.current').forEach(e => e.classList.remove('current'));
-  const div = document.createElement('div');
-  div.className = 'current';
-  div.textContent = msg;
-  log.appendChild(div);
-  // Trim to last 20 lines
+  log.querySelectorAll('.cur').forEach(e => e.classList.remove('cur'));
+  const d = document.createElement('div'); d.className='cur'; d.textContent = msg;
+  log.appendChild(d);
   while (log.children.length > 20) log.removeChild(log.firstChild);
   log.scrollTop = log.scrollHeight;
 }
-function clearStepLog() {
-  document.getElementById('step-log').innerHTML = '';
-}
+function clearLog() { document.getElementById('step-log').innerHTML = ''; }
 
-// ─────────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
 // CONTROLS
-// ─────────────────────────────────────────────────────────────────────
-document.getElementById('btn-stop').addEventListener('click', () => {
-  stopAnim();
-  logStep('■ stopped');
-});
+// ─────────────────────────────────────────────────────────────────────────────
+document.getElementById('btn-stop').addEventListener('click', () => { stopAnim(); logLine('■ stopped'); });
 
 const speedSlider = document.getElementById('speed-slider');
-const speedVal = document.getElementById('speed-val');
+const speedVal    = document.getElementById('speed-val');
 speedSlider.addEventListener('input', () => {
   state.speed = speedSlider.value / 100;
   speedVal.textContent = state.speed.toFixed(2).replace(/\.?0+$/,'') + '×';
 });
 
-// ─────────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
 // INIT
-// ─────────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
 buildServoPanel();
-buildCommandGrid();
+buildCmdGrid();
 setFace('idle', 'boomerang');
 drawRobot();
 </script>
