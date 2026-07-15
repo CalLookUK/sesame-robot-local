@@ -607,14 +607,14 @@ const LEGS = [
     hipFn:  v => (v - 90) * (Math.PI/180),
     kneeFn: v => -(v - 90) * (Math.PI/180) },
   { name:'FL', hs:'L1', ks:'L2', mount:[-28, 42, -8], dir0: N0L,
-    hipFn:  v => -(v - 90) * (Math.PI/180),
-    kneeFn: v =>  (v - 90) * (Math.PI/180) },
+    hipFn:  v =>  (v - 90) * (Math.PI/180),
+    kneeFn: v => -(v - 90) * (Math.PI/180) },
   { name:'BR', hs:'R4', ks:'R3', mount:[ 28,-42, -8], dir0: N0,
     hipFn:  v => -(v - 90) * (Math.PI/360),
     kneeFn: v =>  (v - 90) * (Math.PI/360) },
   { name:'BL', hs:'L4', ks:'L3', mount:[-28,-42, -8], dir0: N0L,
-    hipFn:  v =>  (v - 90) * (Math.PI/360),
-    kneeFn: v => -(v - 90) * (Math.PI/360) },
+    hipFn:  v => -(v - 90) * (Math.PI/360),
+    kneeFn: v =>  (v - 90) * (Math.PI/360) },
 ];
 
 function computeLeg(leg) {
