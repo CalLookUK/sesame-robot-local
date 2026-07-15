@@ -652,31 +652,35 @@ function fitPlane(pts) {
 
 // ── Robot geometry (mm) ──────────────────────────────────────────────────────
 // Body centre in world space — height chosen so feet are at Z≈0 in stand pose
-const BDY = { cx:0, cy:0, cz:82, w:58, d:86, h:20 };
+const BDY = { cx:0, cy:0, cz:107, w:58, d:86, h:20 };
 
 // Neutral upper-leg direction at servo=90° (outward & slightly down).
-// Exact normalization of (1, 0, -0.5) so segment lengths are precisely UPP/LOW mm.
+// Exact normalization of (1, 0, -0.5) so segment lengths are precisely leg.upp/leg.low mm.
 const _n0len = Math.sqrt(1 + 0.25);
 const N0  = [ 1/_n0len, 0, -0.5/_n0len];  // right-side neutral
 const N0L = [-1/_n0len, 0, -0.5/_n0len];  // left-side neutral (mirror X)
 
-const UPP = 40, LOW = 38;  // segment lengths (mm)
+// Leg segment lengths from STL analysis:
+// Front leg joint pieces (R1/R2-v117.stl): 49.5mm pivot-to-pivot
+// Back leg joint pieces (R3/R4-v117.stl): 58.4mm pivot-to-pivot
+const UPP_F = 50, LOW_F = 50;  // front leg segments (mm)
+const UPP_B = 58, LOW_B = 58;  // back leg segments (mm)
 
 // Leg definitions
 // hipFn/kneeFn: servo value → rotation angle in radians
 // Front legs: servo 45–135 maps to ≈ ±45° physical swing
 // Back legs: servo 0–180 maps to ≈ ±45° physical swing (half-scale)
 const LEGS = [
-  { name:'FR', hs:'R1', ks:'R2', mount:[ 28, 42, -8], dir0: N0,
+  { name:'FR', hs:'R1', ks:'R2', mount:[ 28, 42, -8], dir0: N0, upp: UPP_F, low: LOW_F,
     hipFn:  v => (v - 90) * (Math.PI/180),
     kneeFn: v => -(v - 90) * (Math.PI/180) },
-  { name:'FL', hs:'L1', ks:'L2', mount:[-28, 42, -8], dir0: N0L,
+  { name:'FL', hs:'L1', ks:'L2', mount:[-28, 42, -8], dir0: N0L, upp: UPP_F, low: LOW_F,
     hipFn:  v =>  (v - 90) * (Math.PI/180),
     kneeFn: v => -(v - 90) * (Math.PI/180) },
-  { name:'BR', hs:'R4', ks:'R3', mount:[ 28,-42, -8], dir0: N0,
+  { name:'BR', hs:'R4', ks:'R3', mount:[ 28,-42, -8], dir0: N0, upp: UPP_B, low: LOW_B,
     hipFn:  v => -(v - 90) * (Math.PI/360),
     kneeFn: v =>  (v - 90) * (Math.PI/360) },
-  { name:'BL', hs:'L4', ks:'L3', mount:[-28,-42, -8], dir0: N0L,
+  { name:'BL', hs:'L4', ks:'L3', mount:[-28,-42, -8], dir0: N0L, upp: UPP_B, low: LOW_B,
     hipFn:  v => -(v - 90) * (Math.PI/360),
     kneeFn: v =>  (v - 90) * (Math.PI/360) },
 ];
@@ -689,9 +693,9 @@ function computeLeg(leg) {
   // This means body pitch/roll naturally rotates the whole leg assembly.
   const [mx, my, mz] = leg.mount;
   const ud = rotY(leg.dir0, hipA);
-  const kbx = mx + ud[0]*UPP, kby = my + ud[1]*UPP, kbz = mz + ud[2]*UPP;
+  const kbx = mx + ud[0]*leg.upp, kby = my + ud[1]*leg.upp, kbz = mz + ud[2]*leg.upp;
   const ld = rotY(ud, kneeA);
-  const fbx = kbx + ld[0]*LOW, fby = kby + ld[1]*LOW, fbz = kbz + ld[2]*LOW;
+  const fbx = kbx + ld[0]*leg.low, fby = kby + ld[1]*leg.low, fbz = kbz + ld[2]*leg.low;
 
   const hip  = bodyToWorld(mx, my, mz);
   const knee = bodyToWorld(kbx, kby, kbz);
@@ -748,9 +752,9 @@ function drawRobot() {
     const ud = rotY(leg.dir0, leg.hipFn(state.servos[leg.hs]));
     const ld = rotY(ud,       leg.kneeFn(state.servos[leg.ks]));
     const [mx, my, mz] = leg.mount;
-    return [mx + ud[0]*UPP + ld[0]*LOW,
-            my + ud[1]*UPP + ld[1]*LOW,
-            mz + ud[2]*UPP + ld[2]*LOW];
+    return [mx + ud[0]*leg.upp + ld[0]*leg.low,
+            my + ud[1]*leg.upp + ld[1]*leg.low,
+            mz + ud[2]*leg.upp + ld[2]*leg.low];
   });
 
   // Step 2: which feet define the support plane?
