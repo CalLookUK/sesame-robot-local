@@ -1388,40 +1388,66 @@ function _solve3x3(A, b) {
   return x; // [cz, pitch_rad, roll_rad]
 }
 
-function solveBodyGravity(footBodies, stanceFlags) {
-  // Build normal equations A^T A x = A^T b
+// Solve a single set of foot contacts (least-squares, tiny stabilisation)
+function _solveContact(footBodies, active) {
   const AtA = [[0,0,0],[0,0,0],[0,0,0]];
-  const Atb = [0, 0, 0];
-  let nStance = 0;
-
-  for (let i = 0; i < 4; i++) {
-    if (!stanceFlags[i]) continue;
-    nStance++;
-    const [fbx, fby, fbz] = footBodies[i];
-    // row: [1, -fbx, fby], rhs: -fbz
-    const row = [1, -fbx, fby];
-    const rhs = -fbz;
+  const Atb = [0,0,0];
+  for (const i of active) {
+    const [bx, by, bz] = footBodies[i];
+    const row = [1, -bx, by]; const rhs = -bz;
     for (let j = 0; j < 3; j++) {
       Atb[j] += row[j] * rhs;
       for (let k = 0; k < 3; k++) AtA[j][k] += row[j] * row[k];
     }
   }
+  AtA[0][0] += 1e-6; AtA[1][1] += 1e-6; AtA[2][2] += 1e-6;
+  return _solve3x3(AtA, Atb);
+}
 
-  if (nStance === 0) return { cz: 66, pitch: 0, roll: 0 };
+// Gravity physics: find the minimum-cz body pose (lowest = gravity wins) where
+// no foot penetrates the floor.  Stance feet (knee down) MUST be on the floor;
+// swing feet MAY touch the floor if that lets the body descend further.
+//
+// Approach: enumerate all contact subsets that include the mandatory (stance) feet,
+// solve each 3x3 constraint system, keep the valid solution with lowest cz.
+function solveBodyGravity(footBodies, stanceFlags) {
+  const mandatory = [0,1,2,3].filter(i =>  stanceFlags[i]);
+  const optional  = [0,1,2,3].filter(i => !stanceFlags[i]);
 
-  // Tikhonov regularisation on pitch (index 1) and roll (index 2).
-  // λ ≈ 500 means a 1mm height deviation costs the same as ~0.045 rad (2.6°) of tilt,
-  // so the solver strongly prefers keeping feet on the floor over staying upright.
-  const lambda = 500;
-  AtA[1][1] += lambda;
-  AtA[2][2] += lambda;
+  let bestCz = Infinity, bestPitch = 0, bestRoll = 0;
 
-  const [cz, pitch, roll] = _solve3x3(AtA, Atb);
-  return {
-    cz:    Math.max(20, Math.min(90, cz)),
-    pitch: Math.max(-0.35, Math.min(0.35, pitch)),
-    roll:  Math.max(-0.35, Math.min(0.35, roll)),
-  };
+  // Try every subset of optional feet added to the mandatory set
+  for (let mask = 0; mask < (1 << optional.length); mask++) {
+    const active = [...mandatory];
+    for (let b = 0; b < optional.length; b++) {
+      if (mask & (1 << b)) active.push(optional[b]);
+    }
+    if (active.length < 3) continue; // need ≥3 contacts for a unique solution
+
+    const [cz, pitch, roll] = _solveContact(footBodies, active);
+
+    // Reject degenerate or out-of-range solutions
+    if (cz < 5 || cz > 120) continue;
+    if (Math.abs(pitch) > 0.6 || Math.abs(roll) > 0.6) continue;
+
+    // All four feet must be at or above the floor (no penetration)
+    let valid = true;
+    for (let i = 0; i < 4; i++) {
+      const [bx, by, bz] = footBodies[i];
+      if (cz + bz - bx * pitch + by * roll < -2) { valid = false; break; }
+    }
+
+    if (valid && cz < bestCz) { bestCz = cz; bestPitch = pitch; bestRoll = roll; }
+  }
+
+  // Fallback: body rests on its lowest stance foot
+  if (bestCz === Infinity && mandatory.length > 0) {
+    const [bx, by, bz] = footBodies[mandatory[0]];
+    return { cz: Math.max(10, -bz), pitch: 0, roll: 0 };
+  }
+  if (bestCz === Infinity) return { cz: 66, pitch: 0, roll: 0 };
+
+  return { cz: bestCz, pitch: bestPitch, roll: bestRoll };
 }
 
 function fwTick(ts) {
