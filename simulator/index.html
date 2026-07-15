@@ -976,6 +976,50 @@ function drawRobot() {
     RCTX.fillText(`CREEP  ${CG.phase}  swing:${swName}  +${Math.round(CG.bodyY)}mm`, 10, 14);
   }
 
+  // ── gravity / contact overlay (static poses only) ────────────────────────
+  if (!FW.active && !CG.active) {
+    const stance  = detectStance();
+    const fbodies = currentFootBodies();
+
+    // Contact points: filled = on floor, open ring = in air
+    LEGS.forEach((leg, i) => {
+      const fb = fbodies[i];
+      const wp = bodyToWorld(fb[0], fb[1], fb[2]);
+      const p  = iso(wp[0], wp[1], wp[2]);
+      RCTX.beginPath(); RCTX.arc(p[0], p[1], 4, 0, 6.2832);
+      if (stance[i]) {
+        RCTX.fillStyle = 'rgba(80,200,255,0.85)'; RCTX.fill();
+      } else {
+        RCTX.strokeStyle = 'rgba(80,200,255,0.4)'; RCTX.lineWidth = 1.5; RCTX.stroke();
+      }
+    });
+
+    // Support polygon on the floor
+    const sPts = LEGS.map((_, i) => stance[i] ? iso(BDY.cx + fbodies[i][0], BDY.cy + fbodies[i][1], 0) : null).filter(Boolean);
+    if (sPts.length >= 2) {
+      RCTX.beginPath(); RCTX.moveTo(...sPts[0]);
+      sPts.slice(1).forEach(p => RCTX.lineTo(...p));
+      if (sPts.length >= 3) RCTX.closePath();
+      RCTX.strokeStyle = 'rgba(80,200,255,0.35)'; RCTX.lineWidth = 1; RCTX.stroke();
+      if (sPts.length >= 3) { RCTX.fillStyle = 'rgba(80,200,255,0.06)'; RCTX.fill(); }
+    }
+
+    // CoM floor projection (yellow dot)
+    const com = iso(BDY.cx, BDY.cy, 0);
+    RCTX.strokeStyle = 'rgba(255,220,0,0.8)'; RCTX.lineWidth = 1.5;
+    RCTX.beginPath(); RCTX.arc(com[0], com[1], 4, 0, 6.2832); RCTX.stroke();
+    RCTX.beginPath(); RCTX.moveTo(com[0]-8, com[1]); RCTX.lineTo(com[0]+8, com[1]);
+    RCTX.moveTo(com[0], com[1]-8); RCTX.lineTo(com[0], com[1]+8); RCTX.stroke();
+
+    // HUD: gravity state
+    const stNames = LEGS.filter((_, i) => stance[i]).map(l => l.name).join('+') || 'none';
+    const pitchDeg = (state.pitch * 180 / Math.PI).toFixed(1);
+    const rollDeg  = (state.roll  * 180 / Math.PI).toFixed(1);
+    RCTX.font = '9px monospace'; RCTX.textAlign = 'left';
+    RCTX.fillStyle = 'rgba(80,200,255,0.85)';
+    RCTX.fillText(`GRAV  stance:${stNames}  cz:${Math.round(BDY.cz)}  pitch:${pitchDeg}°  roll:${rollDeg}°`, 10, 14);
+  }
+
   // ── axes legend (small, bottom-right corner) ─────────────────────────────
   _drawAxes();
 }
@@ -1126,8 +1170,8 @@ function runStep(seq) {
   const transMs = (step.delay || 0) / state.speed;
   if (step.servos) setServos(step.servos, transMs * 0.9);
   const ms = (step.delay || 0) / state.speed;
-  if (ms > 0) state.animTimer = setTimeout(() => runStep(seq), ms);
-  else runStep(seq);
+  if (ms > 0) state.animTimer = setTimeout(() => { applyGravityPose(); runStep(seq); }, ms);
+  else { applyGravityPose(); runStep(seq); }
 }
 
 function descStep(s) {
@@ -1268,6 +1312,37 @@ function fwNextIdx(idx) {
   return FW_LOOP_START + (idx - FW_LOOP_START + 1) % span;
 }
 
+// Detect stance for current state.servos (knee physAngle < threshold = on ground)
+function detectStance() {
+  return LEGS.map(leg => leg.kneeFn(state.servos[leg.ks]) < 0.18);
+}
+
+// Compute foot body-frame positions from current state.servos (flat-body approx)
+function currentFootBodies() {
+  return LEGS.map((leg, i) => {
+    const hipA = leg.hipFn(state.servos[leg.hs]);
+    const physA = leg.kneeFn(state.servos[leg.ks]);
+    const [mx, my, mz] = leg.mount;
+    const ud = rotZ(leg.dir0, hipA);
+    const sp = Math.sin(physA), cp = Math.cos(physA);
+    return [mx + ud[0]*(leg.upp + sp*leg.low),
+            my + ud[1]*(leg.upp + sp*leg.low),
+            mz - cp*leg.low];
+  });
+}
+
+// Apply gravity physics to a static pose: solves body Z/pitch/roll so stance
+// feet sit on the floor (Z=0). Call after updating state.servos for any pose.
+function applyGravityPose() {
+  if (FW.active || CG.active) return; // gaits manage their own body pose
+  const stance = detectStance();
+  const footBodies = currentFootBodies();
+  const { cz, pitch, roll } = solveBodyGravity(footBodies, stance);
+  BDY.cz      = cz;
+  state.pitch = pitch;
+  state.roll  = roll;
+}
+
 function fwApplyServos(servos) {
   for (const [k, v] of Object.entries(servos)) {
     state.servos[k] = v;
@@ -1388,13 +1463,6 @@ function fwTick(ts) {
     }
   }
   if (sc > 0) { FW.bodyX = sx / sc; FW.bodyY = sy / sc; }
-
-  // Body Z + pitch + roll from gravity physics (stance feet must touch floor)
-  const footBodies = LEGS.map((_, i) => fwFootBody(i, servos));
-  const { cz, pitch, roll } = solveBodyGravity(footBodies, FW.stance);
-  BDY.cz   = cz;
-  state.pitch = pitch;
-  state.roll  = roll;
 
   fwApplyServos(servos);
   BDY.cx = FW.bodyX; BDY.cy = FW.bodyY;
