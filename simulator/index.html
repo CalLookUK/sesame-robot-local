@@ -895,6 +895,38 @@ function drawRobot() {
 
   [1, 0].forEach(i => _drawLeg(legs[i], LEGS[i].name, false));
 
+  // ── firmware walk overlays ───────────────────────────────────────────────
+  if (FW.active && FW.footW) {
+    // Support polygon from stance feet
+    const fwPts = FW.footW.map((fw, i) => FW.stance[i] ? iso(fw[0], fw[1], 0) : null).filter(Boolean);
+    if (fwPts.length >= 3) {
+      RCTX.beginPath(); RCTX.moveTo(...fwPts[0]);
+      fwPts.slice(1).forEach(p => RCTX.lineTo(...p));
+      RCTX.closePath();
+      RCTX.fillStyle = 'rgba(80,160,255,0.07)'; RCTX.fill();
+      RCTX.strokeStyle = 'rgba(80,160,255,0.3)'; RCTX.lineWidth = 1; RCTX.stroke();
+    }
+    // Contact point markers (filled circle = on ground, open = swing)
+    FW.footW.forEach((fw, i) => {
+      const p = iso(fw[0], fw[1], 0);
+      RCTX.beginPath(); RCTX.arc(p[0], p[1], 4, 0, 6.2832);
+      if (FW.stance[i]) {
+        RCTX.fillStyle = 'rgba(80,200,255,0.8)'; RCTX.fill();
+      } else {
+        RCTX.strokeStyle = 'rgba(80,200,255,0.4)'; RCTX.lineWidth = 1.5; RCTX.stroke();
+      }
+    });
+    // Body path dot
+    const bp = iso(FW.bodyX, FW.bodyY, 0);
+    RCTX.strokeStyle = 'rgba(255,220,0,0.8)'; RCTX.lineWidth = 1.5;
+    RCTX.beginPath(); RCTX.arc(bp[0], bp[1], 4, 0, 6.2832); RCTX.stroke();
+    // HUD
+    const stNames = LEGS.filter((_, i) => FW.stance[i]).map(l => l.name).join('+') || '—';
+    RCTX.font = '9px monospace'; RCTX.textAlign = 'left';
+    RCTX.fillStyle = 'rgba(80,200,255,0.85)';
+    RCTX.fillText(`WALK  frame:${FW.frameIdx}  stance:${stNames}  +${Math.round(FW.bodyY)}mm`, 10, 14);
+  }
+
   // ── creep gait overlays ──────────────────────────────────────────────────
   if (CG.active && CG.footW) {
     // Support polygon (stance feet only)
@@ -1155,79 +1187,177 @@ function logLine(msg) {
 function clearLog() { document.getElementById('step-log').innerHTML = ''; }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// CONTINUOUS TROT GAIT
+// FIRMWARE WALK PLAYBACK
 // ─────────────────────────────────────────────────────────────────────────────
-// Hip joints sweep in the horizontal X-Y plane (Z-axis shaft).
-// Diagonal pairs alternate: A=(FR+BL) and B=(FL+BR).
-// Leg index: 0=FR, 1=FL, 2=BR, 3=BL
-//   Group A (FR+BL, phase 0):   stance 0–0.5, swing 0.5–1.0
-//   Group B (FL+BR, phase 0.5): stance 0–0.5, swing 0.5–1.0
+// Replays the exact servo angle keyframes from firmware runWalkPose().
+// Body (X,Y) is derived each frame from stance-foot FK constraints — no assumed
+// velocity. This reveals the actual contact points and body motion path.
 //
-// Servo values per leg — FR(0), FL(1), BR(2), BL(3):
-//   FR: hip=R1(STAND=135,REST=90), knee=R3(STAND=180,REST=90)
-//   FL: hip=L1(STAND=45, REST=90), knee=L3(STAND=0,  REST=90)
-//   BR: hip=R2(STAND=45, REST=90), knee=R4(STAND=0,  REST=90)
-//   BL: hip=L2(STAND=135,REST=90), knee=L4(STAND=180,REST=90)
+// Leg mapping: 0=FR, 1=FL, 2=BR, 3=BL
+//   FR: hip=R1, knee=R3   FL: hip=L1, knee=L3
+//   BR: hip=R2, knee=R4   BL: hip=L2, knee=L4
+//
+// Firmware walk cycle — one pressingCheck call per keyframe (WD=100ms each):
+//   Frame 0  (initial)  : R3=135,L3=45, R2=100,L1=25  (both front knees lift)
+//   Frame 1  (step 1)   : L3=0                          (FL sets down)
+//   Frame 2  (step 2)   : L4=135,L2=90, R4=0, R1=180   (BL lifts, FR hip fwd)
+//   Frame 3  (step 3)   : R2=45, L1=90                  (weight shift)
+//   Frame 4  (step 4)   : R4=45, L4=180                 (BR lifts, BL sets)
+//   Frame 5  (step 5)   : R3=180,L3=45, R2=90, L1=0    (FR sets, FL lifts)
+//   Frame 6  (step 6)   : L2=135,R1=90                  (BL hip back, FR hip back)
+//   → repeat frames 1–6
 
-const GAIT_PHASE_OFF = [  0, 0.5, 0.5,   0];      // per-leg phase offset
-const GAIT_STA_HIP   = [135,  45,  45, 135];       // STAND hip  (foot on floor)
-const GAIT_STA_KNEE  = [180,   0,   0, 180];       // STAND knee (foot on floor)
-const GAIT_SWG_HIP   = [ 90,  90,  90,  90];       // REST  hip  (foot lifted)
-const GAIT_SWG_KNEE  = [ 90,  90,  90,  90];       // REST  knee
+const FW_FRAMES = [
+  // Frame 0: initial (from STAND, changes: R3=135,L3=45,R2=100,L1=25)
+  {R1:135, R2:100, L1:25,  L2:135, R3:135, R4:0,  L3:45, L4:180},
+  // Frame 1: step 1 — L3=0
+  {R1:135, R2:100, L1:25,  L2:135, R3:135, R4:0,  L3:0,  L4:180},
+  // Frame 2: step 2 — L4=135,L2=90,R4=0,R1=180
+  {R1:180, R2:100, L1:25,  L2:90,  R3:135, R4:0,  L3:0,  L4:135},
+  // Frame 3: step 3 — R2=45,L1=90
+  {R1:180, R2:45,  L1:90,  L2:90,  R3:135, R4:0,  L3:0,  L4:135},
+  // Frame 4: step 4 — R4=45,L4=180
+  {R1:180, R2:45,  L1:90,  L2:90,  R3:135, R4:45, L3:0,  L4:180},
+  // Frame 5: step 5 — R3=180,L3=45,R2=90,L1=0
+  {R1:180, R2:90,  L1:0,   L2:90,  R3:180, R4:45, L3:45, L4:180},
+  // Frame 6: step 6 — L2=135,R1=90
+  {R1:90,  R2:90,  L1:0,   L2:135, R3:180, R4:45, L3:45, L4:180},
+];
+const FW_LOOP_START = 1; // after frame 0, loop frames 1–6
 
-let _gaitRAF = null, _gaitLastT = 0;
+const FW = {
+  active: false,
+  frameIdx: 0,
+  frameT: 0,       // 0→1 progress through current frame
+  bodyX: 0, bodyY: 0,
+  footW: null,     // world foot positions [4]×[x,y,z]
+  stance: [false, false, false, false],
+  raf: null,
+  lastTS: 0,
+};
 
-function _gaitTick(ts) {
-  if (!state.gait.active) return;
-  const dt = Math.min((ts - _gaitLastT) / 1000, 0.05);
-  _gaitLastT = ts;
-  state.gait.time += dt * state.gait.speed;
+// Foot position in body frame for given servo map (independent of state.servos)
+function fwFootBody(legIdx, servos) {
+  const leg = LEGS[legIdx];
+  const hipA = leg.hipFn(servos[leg.hs]);
+  const physAngle = leg.kneeFn(servos[leg.ks]);
+  const [mx, my, mz] = leg.mount;
+  const ud = rotZ(leg.dir0, hipA);
+  const sp = Math.sin(physAngle), cp = Math.cos(physAngle);
+  return [
+    mx + ud[0] * (leg.upp + sp * leg.low),
+    my + ud[1] * (leg.upp + sp * leg.low),
+    mz - cp * leg.low,
+  ];
+}
 
-  for (let i = 0; i < 4; i++) {
-    const phase = (state.gait.time + GAIT_PHASE_OFF[i]) % 1;
-    state.gait.legIsStance[i] = phase < 0.5;
+// Leg is in stance when physAngle is near 0 (foot pointing straight down)
+function fwIsStance(legIdx, servos) {
+  return LEGS[legIdx].kneeFn(servos[LEGS[legIdx].ks]) < 0.18; // < ~10°
+}
 
-    // Swing arc: sine bell 0→1→0 over the swing half-cycle
-    const lift  = phase < 0.5 ? 0 : Math.sin(Math.PI * (phase - 0.5) / 0.5);
-    const hip   = GAIT_STA_HIP[i]  + (GAIT_SWG_HIP[i]  - GAIT_STA_HIP[i])  * lift;
-    const knee  = GAIT_STA_KNEE[i] + (GAIT_SWG_KNEE[i] - GAIT_STA_KNEE[i]) * lift;
+function fwLerp(a, b, t) {
+  const o = {};
+  for (const k of Object.keys(a)) o[k] = a[k] + (b[k] - a[k]) * t;
+  return o;
+}
 
-    const leg = LEGS[i];
-    state.servos[leg.hs] = hip;
-    state.servos[leg.ks] = knee;
-    const hsl = document.getElementById('sv-'+leg.hs);
-    const ksl = document.getElementById('sv-'+leg.ks);
-    const hvl = document.getElementById('sv-val-'+leg.hs);
-    const kvl = document.getElementById('sv-val-'+leg.ks);
-    if (hsl) hsl.value = hip;
-    if (ksl) ksl.value = knee;
-    if (hvl) hvl.textContent = Math.round(hip)  + '°';
-    if (kvl) kvl.textContent = Math.round(knee) + '°';
+function fwNextIdx(idx) {
+  if (idx === 0) return FW_LOOP_START;
+  const span = FW_FRAMES.length - FW_LOOP_START;
+  return FW_LOOP_START + (idx - FW_LOOP_START + 1) % span;
+}
+
+function fwApplyServos(servos) {
+  for (const [k, v] of Object.entries(servos)) {
+    state.servos[k] = v;
+    const sl = document.getElementById('sv-' + k);
+    const vl = document.getElementById('sv-val-' + k);
+    if (sl) sl.value = v;
+    if (vl) vl.textContent = Math.round(v) + '°';
+  }
+}
+
+function fwTick(ts) {
+  if (!FW.active) return;
+  const dt = Math.min((ts - FW.lastTS) / 1000, 0.05);
+  FW.lastTS = ts;
+
+  FW.frameT += dt / (WD / 1000);
+
+  // Advance keyframes (may skip >1 if dt is large)
+  while (FW.frameT >= 1) {
+    FW.frameT -= 1;
+    FW.frameIdx = fwNextIdx(FW.frameIdx);
+    const newS = FW_FRAMES[FW.frameIdx];
+    // Detect stance transitions; plant newly-grounded feet
+    for (let i = 0; i < 4; i++) {
+      const now = fwIsStance(i, newS);
+      if (now && !FW.stance[i]) {
+        const fb = fwFootBody(i, newS);
+        FW.footW[i] = [FW.bodyX + fb[0], FW.bodyY + fb[1], 0];
+      }
+      FW.stance[i] = now;
+    }
   }
 
+  // Interpolated servo state between current and next keyframe
+  const cur = FW_FRAMES[FW.frameIdx];
+  const nxt = FW_FRAMES[fwNextIdx(FW.frameIdx)];
+  const servos = fwLerp(cur, nxt, FW.frameT);
+
+  // Derive body XY from stance feet (FK inverse)
+  let sx = 0, sy = 0, sc = 0;
+  for (let i = 0; i < 4; i++) {
+    if (FW.stance[i]) {
+      const fb = fwFootBody(i, servos);
+      sx += FW.footW[i][0] - fb[0];
+      sy += FW.footW[i][1] - fb[1];
+      sc++;
+    }
+  }
+  if (sc > 0) { FW.bodyX = sx / sc; FW.bodyY = sy / sc; }
+
+  fwApplyServos(servos);
+  BDY.cx = FW.bodyX; BDY.cy = FW.bodyY;
+  cam.x  = FW.bodyX; cam.y  = FW.bodyY;
+
   drawRobot();
-  _gaitRAF = requestAnimationFrame(_gaitTick);
+  FW.raf = requestAnimationFrame(fwTick);
 }
 
 function startGait() {
   if (CG.active) stopCreep();
   if (state.animTimer) { clearTimeout(state.animTimer); state.animTimer = null; state.animName = null; }
-  // Snap to STAND before starting so the first step is clean
+
+  FW.bodyX = 0; FW.bodyY = 0;
+  BDY.cx = 0; BDY.cy = 0;
+  cam.x = 0; cam.y = 0;
+
+  // Start from stand; record world foot positions from FK
   Object.entries(STAND).forEach(([k, v]) => { state.servos[k] = v; });
-  state.gait.active = true;
-  state.gait.time   = 0;
-  state.gait.legIsStance = [true, true, true, true];
+  FW.footW = LEGS.map((_, i) => {
+    const fb = fwFootBody(i, STAND);
+    return [fb[0], fb[1], 0]; // body at origin → world = body frame
+  });
+  FW.stance  = [true, true, true, true];
+  FW.frameIdx = 0;
+  FW.frameT   = 0;
+  FW.active   = true;
+  state.gait.active = true; // keep existing stop logic working
+
   setFace('walk', 'loop');
   const btn = document.getElementById('btn-walk');
   if (btn) { btn.textContent = '⏹ Stop Walk'; btn.classList.add('walk-active'); }
-  _gaitLastT = performance.now();
-  _gaitRAF = requestAnimationFrame(_gaitTick);
-  logLine('🐾 trot gait started');
+  FW.lastTS = performance.now();
+  FW.raf = requestAnimationFrame(fwTick);
+  logLine('🐾 firmware walk started');
 }
 
 function stopGait() {
+  FW.active = false;
   state.gait.active = false;
-  if (_gaitRAF) { cancelAnimationFrame(_gaitRAF); _gaitRAF = null; }
+  if (FW.raf) { cancelAnimationFrame(FW.raf); FW.raf = null; }
   const btn = document.getElementById('btn-walk');
   if (btn) { btn.textContent = '🐾 Walk'; btn.classList.remove('walk-active'); }
   setFace('stand', 'once');
@@ -1238,8 +1368,9 @@ function stopGait() {
     if (sl) sl.value = v;
     if (vl) vl.textContent = Math.round(v) + '°';
   });
+  BDY.cx = 0; BDY.cy = 0; cam.x = 0; cam.y = 0;
   drawRobot();
-  logLine('⏹ gait stopped');
+  logLine('⏹ walk stopped');
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
