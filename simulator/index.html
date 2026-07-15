@@ -219,6 +219,7 @@ h1{
       <div class="cmd-grid" id="cmd-grid"></div>
       <div class="controls">
         <button class="ctrl-btn" id="btn-walk">🐾 Walk</button>
+        <button class="ctrl-btn" id="btn-creep">🦎 Creep</button>
         <button class="ctrl-btn primary" id="btn-stop">■ Stop</button>
         <div class="speed-row">
           Speed:
@@ -604,10 +605,14 @@ const ISO_SCALE = 1.05;         // px per world-unit (mm)
 // Canvas origin (screen centre for the world origin)
 const OX = 250, OY = 182;
 
+// Camera tracks the body during creep so the robot stays centred on screen
+let cam = { x: 0, y: 0 };
+
 function iso(wx, wy, wz) {
+  const rx = wx - cam.x, ry = wy - cam.y;
   return [
-    OX + (wx - wy) * ISO_COS * ISO_SCALE,
-    OY + ((wx + wy) * ISO_SIN - wz) * ISO_SCALE,
+    OX + (rx - ry) * ISO_COS * ISO_SCALE,
+    OY + ((rx + ry) * ISO_SIN - wz) * ISO_SCALE,
   ];
 }
 
@@ -682,16 +687,20 @@ const LOW = 58;  // lower leg length (mm)
 const LEGS = [
   { name:'FR', hs:'R1', ks:'R3', mount:[ 28, 42, -8], dir0: N0,  upp: UPP, low: LOW,
     hipFn:  v => (v - 90) * (Math.PI/180),
-    kneeFn: v => (180 - v) * (Math.PI/180) },
+    kneeFn: v => (180 - v) * (Math.PI/180),
+    kneeInv: true  },   // R3: servo 180 = straight down
   { name:'FL', hs:'L1', ks:'L3', mount:[-28, 42, -8], dir0: N0L, upp: UPP, low: LOW,
     hipFn:  v => (v - 90) * (Math.PI/180),
-    kneeFn: v => v * (Math.PI/180) },
+    kneeFn: v => v * (Math.PI/180),
+    kneeInv: false },   // L3: servo   0 = straight down
   { name:'BR', hs:'R2', ks:'R4', mount:[ 28,-42, -8], dir0: N0,  upp: UPP, low: LOW,
     hipFn:  v => (v - 90) * (Math.PI/180),
-    kneeFn: v => v * (Math.PI/180) },
+    kneeFn: v => v * (Math.PI/180),
+    kneeInv: false },   // R4: servo   0 = straight down
   { name:'BL', hs:'L2', ks:'L4', mount:[-28,-42, -8], dir0: N0L, upp: UPP, low: LOW,
     hipFn:  v => (v - 90) * (Math.PI/180),
-    kneeFn: v => (180 - v) * (Math.PI/180) },
+    kneeFn: v => (180 - v) * (Math.PI/180),
+    kneeInv: true  },   // L4: servo 180 = straight down
 ];
 
 function computeLeg(leg) {
@@ -713,6 +722,54 @@ function computeLeg(leg) {
   const foot = bodyToWorld(fbx, fby, fbz);
 
   return { hip, knee, foot, grounded: foot[2] <= 8 };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// INVERSE KINEMATICS
+// ─────────────────────────────────────────────────────────────────────────────
+// Given a foot target (fx,fy,fz) expressed in body frame RELATIVE to the leg's
+// hip mount point, compute the two servo values.
+//
+// Math:
+//   θ1 (hip yaw) = atan2(fy,fx) − neutral_direction_angle
+//   r  = sqrt(fx²+fy²)          horizontal reach to foot
+//   rk = r − UPP                horizontal reach from KNEE to foot
+//   physAngle = atan2(rk, −fz)  knee pitch (0=down, π/2=horizontal)
+//   kneeServo = 180−physAngle° if kneeInv, else physAngle°
+function ikLeg(leg, fx, fy, fz) {
+  const targetA  = Math.atan2(fy, fx);
+  const neutralA = Math.atan2(leg.dir0[1], leg.dir0[0]);
+  const hipA     = targetA - neutralA;
+
+  const r   = Math.sqrt(fx*fx + fy*fy);
+  let rk    = r - leg.upp;
+  let dz    = fz; // negative = below hip
+
+  // Clamp foot to reachable sphere (radius = lower-leg length minus 1 mm margin)
+  const maxR = leg.low - 1;
+  const dist = Math.sqrt(rk*rk + dz*dz);
+  if (dist > maxR) { const s = maxR / dist; rk *= s; dz *= s; }
+  if (dist < 4)    { dz = -4; rk = 0; } // prevent gimbal at full retraction
+
+  const physAngle = Math.atan2(Math.max(0, rk), -dz);
+  const paDeg = physAngle * (180 / Math.PI);
+
+  const hipDeg   = Math.max(0, Math.min(180, hipA * (180 / Math.PI) + 90));
+  const kneeDeg  = Math.max(0, Math.min(180, leg.kneeInv ? 180 - paDeg : paDeg));
+  return { hipDeg, kneeDeg };
+}
+
+// Apply IK result to state.servos and update DOM sliders for one leg
+function applyIKLeg(leg, fx, fy, fz) {
+  const { hipDeg, kneeDeg } = ikLeg(leg, fx, fy, fz);
+  const vals = { [leg.hs]: hipDeg, [leg.ks]: kneeDeg };
+  Object.entries(vals).forEach(([n, v]) => {
+    state.servos[n] = v;
+    const sl = document.getElementById('sv-' + n);
+    const vl = document.getElementById('sv-val-' + n);
+    if (sl) sl.value = v;
+    if (vl) vl.textContent = Math.round(v) + '°';
+  });
 }
 
 // ── Drawing helpers ──────────────────────────────────────────────────────────
@@ -766,23 +823,22 @@ function drawRobot() {
   const legs = LEGS.map(computeLeg);
 
   // ── floor ───────────────────────────────────────────────────────────────
-  const GS = 22, GR = 110; // grid spacing, grid radius
+  const GS = 22, GR = 110; // grid spacing, grid radius (world mm)
 
-  // Floor fill
-  const fc = [iso(-GR,-GR,0), iso(GR,-GR,0), iso(GR,GR,0), iso(-GR,GR,0)];
+  // Snap grid origin to camera so the grid tiles seamlessly as the body walks
+  const gx0 = Math.floor((cam.x - GR) / GS) * GS;
+  const gx1 = Math.ceil ((cam.x + GR) / GS) * GS;
+  const gy0 = Math.floor((cam.y - GR) / GS) * GS;
+  const gy1 = Math.ceil ((cam.y + GR) / GS) * GS;
+  const fc = [iso(gx0,gy0,0), iso(gx1,gy0,0), iso(gx1,gy1,0), iso(gx0,gy1,0)];
   poly(fc, '#080f08');
 
-  // Grid lines
   RCTX.globalAlpha = 0.55;
-  for (let v = -GR; v <= GR; v += GS) {
-    // Lines along X (constant Y)
-    line(iso(-GR, v, 0), iso(GR, v, 0), '#1a2e1a', 0.7);
-    // Lines along Y (constant X)
-    line(iso(v, -GR, 0), iso(v,  GR, 0), '#1a2e1a', 0.7);
-  }
+  for (let v = gy0; v <= gy1; v += GS)
+    line(iso(gx0, v, 0), iso(gx1, v, 0), '#1a2e1a', 0.7);
+  for (let v = gx0; v <= gx1; v += GS)
+    line(iso(v, gy0, 0), iso(v, gy1, 0), '#1a2e1a', 0.7);
   RCTX.globalAlpha = 1;
-
-  // Floor border
   poly(fc, null, '#1e321e', 1.2);
 
   // ── floor contact ellipses ───────────────────────────────────────────────
@@ -835,6 +891,55 @@ function drawRobot() {
   RCTX.fillText('BACK', backMid[0], backMid[1]+3);
 
   [1, 0].forEach(i => _drawLeg(legs[i], LEGS[i].name, false));
+
+  // ── creep gait overlays ──────────────────────────────────────────────────
+  if (CG.active && CG.footW) {
+    // Support polygon (stance feet only)
+    const sPts = CG.footW
+      .map((fw, i) => (i === CG.swingLeg) ? null : iso(fw[0], fw[1], 0))
+      .filter(Boolean);
+    if (sPts.length >= 3) {
+      RCTX.beginPath(); RCTX.moveTo(...sPts[0]);
+      sPts.slice(1).forEach(p => RCTX.lineTo(...p));
+      RCTX.closePath();
+      RCTX.fillStyle   = 'rgba(0,180,80,0.07)';  RCTX.fill();
+      RCTX.strokeStyle = 'rgba(0,180,80,0.28)';  RCTX.lineWidth = 1;  RCTX.stroke();
+    }
+
+    // Stance foot targets (× markers on floor)
+    CG.footW.forEach((fw, i) => {
+      if (i === CG.swingLeg) return;
+      const p = iso(fw[0], fw[1], 0); const s = 4;
+      RCTX.strokeStyle = 'rgba(0,200,100,0.45)'; RCTX.lineWidth = 1;
+      RCTX.beginPath();
+      RCTX.moveTo(p[0]-s,p[1]-s); RCTX.lineTo(p[0]+s,p[1]+s);
+      RCTX.moveTo(p[0]+s,p[1]-s); RCTX.lineTo(p[0]-s,p[1]+s);
+      RCTX.stroke();
+    });
+
+    // Swing-foot landing target (orange circle)
+    if (CG.swingLeg >= 0) {
+      const tp = iso(CG.swingTo[0], CG.swingTo[1], 0);
+      RCTX.strokeStyle = 'rgba(255,140,66,0.7)'; RCTX.lineWidth = 1.5;
+      RCTX.beginPath(); RCTX.arc(tp[0], tp[1], 5, 0, 6.2832); RCTX.stroke();
+    }
+
+    // CoM projection (yellow crosshair)
+    const comP = iso(CG.bodyX, CG.bodyY, 0);
+    RCTX.strokeStyle = 'rgba(255,220,0,0.75)'; RCTX.lineWidth = 1.5;
+    RCTX.beginPath(); RCTX.arc(comP[0], comP[1], 4, 0, 6.2832); RCTX.stroke();
+    RCTX.strokeStyle = 'rgba(255,220,0,0.35)'; RCTX.lineWidth = 1;
+    RCTX.beginPath();
+    RCTX.moveTo(comP[0]-9,comP[1]); RCTX.lineTo(comP[0]+9,comP[1]);
+    RCTX.moveTo(comP[0],comP[1]-9); RCTX.lineTo(comP[0],comP[1]+9);
+    RCTX.stroke();
+
+    // HUD: phase + swing leg name
+    const swName = CG.swingLeg >= 0 ? LEGS[CG.swingLeg].name : '—';
+    RCTX.font = '9px monospace'; RCTX.textAlign = 'left';
+    RCTX.fillStyle = 'rgba(0,200,100,0.85)';
+    RCTX.fillText(`CREEP  ${CG.phase}  swing:${swName}  +${Math.round(CG.bodyY)}mm`, 10, 14);
+  }
 
   // ── axes legend (small, bottom-right corner) ─────────────────────────────
   _drawAxes();
@@ -1102,6 +1207,7 @@ function _gaitTick(ts) {
 }
 
 function startGait() {
+  if (CG.active) stopCreep();
   if (state.animTimer) { clearTimeout(state.animTimer); state.animTimer = null; state.animName = null; }
   // Snap to STAND before starting so the first step is clean
   Object.entries(STAND).forEach(([k, v]) => { state.servos[k] = v; });
@@ -1134,13 +1240,220 @@ function stopGait() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// CREEP GAIT  (world-frame IK, one leg swings at a time, CoM shifting)
+// ─────────────────────────────────────────────────────────────────────────────
+//
+// World frame: floor Z=0, body walks in +Y direction.
+// The body centre (BDY.cx, BDY.cy) moves in world space; camera tracks it so
+// the view stays centred. Feet are given fixed world-frame targets during stance;
+// IK converts those targets to servo angles each frame.
+//
+// Gait cycle (4-beat creep, diagonally ordered for smooth CoM transfer):
+//   leg order: FR(0) → BL(3) → FL(1) → BR(2) → repeat
+//   phases per step: stance (body moves fwd) → com_shift (lateral body shift)
+//                    → swing (parabolic foot trajectory) → back to stance
+//
+// CoM shift: before swinging a right leg shift body −X (left),
+//            before swinging a left leg shift body +X (right).
+// ─────────────────────────────────────────────────────────────────────────────
+const CG_VELOCITY  = 25;    // mm/s forward body speed
+const CG_STEP      = 34;    // mm stride length
+const CG_HEIGHT    = 20;    // mm peak foot lift (parabolic arc)
+const CG_SWING_DUR = 0.32;  // seconds per swing phase
+const CG_COM_DUR   = 0.20;  // seconds per CoM-shift phase
+const CG_COM_AMT   = 18;    // mm lateral CoM shift magnitude
+const CG_ORDER     = [0, 3, 1, 2]; // FR, BL, FL, BR
+const CG_IS_RIGHT  = new Set([0, 2]); // FR, BR → need left-shift before swing
+
+const CG = {
+  active: false,
+  bodyX: 0, bodyY: 0,        // body world position
+  bodyXStart: 0,             // bodyX at start of current com_shift
+  bodyXTarget: 0,            // bodyX target for com_shift
+  footW: null,               // [4]×[wx,wy,wz] world-frame foot positions
+  phase: 'stance',           // 'stance' | 'com_shift' | 'swing'
+  orderIdx: 0,               // index into CG_ORDER
+  swingLeg: -1,              // currently swinging leg index (or -1)
+  swingT: 0,                 // swing phase progress 0→1
+  comT:   0,                 // com_shift phase progress 0→1
+  swingFrom: [0, 0],         // world XY where swing started
+  swingTo:   [0, 0],         // world XY where foot will land
+  lastTS: 0,
+  raf: null,
+};
+
+// World-frame foot positions when all legs are in STAND pose (bodyX=0, bodyY=0)
+function cgStandFeet() {
+  return LEGS.map(leg => {
+    const hipA = leg.hipFn(STAND[leg.hs]);
+    const phys = leg.kneeFn(STAND[leg.ks]);
+    const [mx, my, mz] = leg.mount;
+    const ud = rotZ(leg.dir0, hipA);
+    const kbx = mx + ud[0]*leg.upp, kby = my + ud[1]*leg.upp;
+    const sp = Math.sin(phys), cp = Math.cos(phys);
+    return [kbx + ud[0]*sp*leg.low, kby + ud[1]*sp*leg.low, 0];
+  });
+}
+
+// Solve IK for all 4 legs from current world state and write servo angles
+function cgSolveAll() {
+  for (let i = 0; i < 4; i++) {
+    const leg = LEGS[i];
+    const [mx, my, mz] = leg.mount;
+    // Hip mount in world frame (body pitch=roll=0)
+    const hipW = [CG.bodyX + mx, CG.bodyY + my, BDY.cz + mz];
+
+    // Foot world target (swing uses interpolated arc, stance uses fixed footW)
+    let fw;
+    if (i === CG.swingLeg) {
+      const t = CG.swingT;
+      // Parabolic (sine bell) lift: Z = H·sin(π·t)
+      fw = [
+        CG.swingFrom[0] + (CG.swingTo[0] - CG.swingFrom[0]) * t,
+        CG.swingFrom[1] + (CG.swingTo[1] - CG.swingFrom[1]) * t,
+        CG_HEIGHT * Math.sin(Math.PI * t),
+      ];
+    } else {
+      fw = CG.footW[i];
+    }
+
+    // Foot relative to hip mount in body frame
+    applyIKLeg(leg, fw[0]-hipW[0], fw[1]-hipW[1], fw[2]-hipW[2]);
+  }
+}
+
+function cgTick(ts) {
+  if (!CG.active) return;
+  const dt = Math.min((ts - CG.lastTS) / 1000, 0.04);
+  CG.lastTS = ts;
+
+  if (CG.phase === 'stance') {
+    // Body advances forward; feet stay fixed in world → effective backward motion
+    CG.bodyY += CG_VELOCITY * dt;
+
+    // Check whether the next-in-order leg needs to swing
+    const next = CG_ORDER[CG.orderIdx];
+    const leg  = LEGS[next];
+    const hipWorldY = CG.bodyY + leg.mount[1];
+    const relY = CG.footW[next][1] - hipWorldY; // negative = foot behind hip
+
+    if (relY < -CG_STEP * 0.45) {
+      // Trigger CoM shift before swinging
+      CG.bodyXTarget = CG_IS_RIGHT.has(next) ? -CG_COM_AMT : CG_COM_AMT;
+      CG.bodyXStart  = CG.bodyX;
+      CG.comT  = 0;
+      CG.phase = 'com_shift';
+    }
+
+  } else if (CG.phase === 'com_shift') {
+    CG.comT += dt / CG_COM_DUR;
+    if (CG.comT >= 1) {
+      CG.comT    = 1;
+      CG.bodyX   = CG.bodyXTarget;
+
+      // Begin swing
+      const si  = CG_ORDER[CG.orderIdx];
+      const leg = LEGS[si];
+      CG.swingLeg  = si;
+      CG.swingT    = 0;
+      CG.swingFrom = [CG.footW[si][0], CG.footW[si][1]];
+      // Land half a stride ahead of hip, aligned with body X
+      CG.swingTo = [
+        CG.bodyX + leg.mount[0] + leg.dir0[0] * leg.upp * 0.5,
+        CG.bodyY + leg.mount[1] + CG_STEP * 0.5,
+      ];
+      CG.phase = 'swing';
+    } else {
+      // Ease-in-out lateral shift
+      const e = CG.comT < 0.5 ? 2*CG.comT*CG.comT : -1+(4-2*CG.comT)*CG.comT;
+      CG.bodyX = CG.bodyXStart + (CG.bodyXTarget - CG.bodyXStart) * e;
+    }
+
+  } else { // 'swing'
+    CG.swingT += dt / CG_SWING_DUR;
+    if (CG.swingT >= 1) {
+      CG.swingT = 1;
+      // Land foot at world target
+      CG.footW[CG.swingLeg] = [CG.swingTo[0], CG.swingTo[1], 0];
+      CG.swingLeg  = -1;
+      CG.orderIdx  = (CG.orderIdx + 1) % 4;
+      CG.phase     = 'stance';
+    }
+  }
+
+  // Sync BDY and camera so render stays body-centred
+  BDY.cx = CG.bodyX;
+  BDY.cy = CG.bodyY;
+  cam.x  = CG.bodyX;
+  cam.y  = CG.bodyY;
+
+  cgSolveAll();
+  drawRobot();
+  CG.raf = requestAnimationFrame(cgTick);
+}
+
+function startCreep() {
+  stopAnim();
+  if (state.gait.active) stopGait();
+
+  // Reset world position and camera
+  CG.bodyX = 0; CG.bodyY = 0;
+  BDY.cx = 0; BDY.cy = 0;
+  cam.x  = 0; cam.y  = 0;
+
+  CG.footW    = cgStandFeet();
+  CG.phase    = 'stance';
+  CG.orderIdx = 0;
+  CG.swingLeg = -1;
+  CG.swingT   = 0;
+  CG.comT     = 0;
+  CG.active   = true;
+
+  setFace('walk', 'loop');
+  const btn = document.getElementById('btn-creep');
+  if (btn) { btn.textContent = '⏹ Stop Creep'; btn.classList.add('walk-active'); }
+  logLine('🦎 creep gait started (world-frame IK)');
+  CG.lastTS = performance.now();
+  CG.raf = requestAnimationFrame(cgTick);
+}
+
+function stopCreep() {
+  CG.active = false;
+  if (CG.raf) { cancelAnimationFrame(CG.raf); CG.raf = null; }
+  CG.swingLeg = -1;
+
+  // Return camera and body to origin
+  BDY.cx = 0; BDY.cy = 0;
+  cam.x  = 0; cam.y  = 0;
+
+  const btn = document.getElementById('btn-creep');
+  if (btn) { btn.textContent = '🦎 Creep'; btn.classList.remove('walk-active'); }
+  setFace('stand', 'once');
+  Object.entries(STAND).forEach(([k, v]) => {
+    state.servos[k] = v;
+    const sl = document.getElementById('sv-' + k);
+    const vl = document.getElementById('sv-val-' + k);
+    if (sl) sl.value = v;
+    if (vl) vl.textContent = Math.round(v) + '°';
+  });
+  drawRobot();
+  logLine('⏹ creep stopped');
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // CONTROLS
 // ─────────────────────────────────────────────────────────────────────────────
 document.getElementById('btn-walk').addEventListener('click', () => {
+  if (CG.active) stopCreep();
   if (state.gait.active) stopGait(); else startGait();
 });
 
+document.getElementById('btn-creep').addEventListener('click', () => {
+  if (CG.active) stopCreep(); else startCreep();
+});
+
 document.getElementById('btn-stop').addEventListener('click', () => {
+  if (CG.active) stopCreep();
   if (state.gait.active) stopGait();
   stopAnim();
   logLine('■ stopped');
