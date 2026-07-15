@@ -654,10 +654,11 @@ function fitPlane(pts) {
 // Body centre in world space — height chosen so feet are at Z≈0 in stand pose
 const BDY = { cx:0, cy:0, cz:82, w:58, d:86, h:20 };
 
-// Neutral upper-leg direction at servo=90° (outward & slightly down)
-// normalize(1, 0, -0.5) ≈ (0.894, 0, -0.447)
-const N0 = [0.894, 0, -0.447];   // right-side neutral
-const N0L= [-0.894, 0, -0.447];  // left-side neutral (mirror X)
+// Neutral upper-leg direction at servo=90° (outward & slightly down).
+// Exact normalization of (1, 0, -0.5) so segment lengths are precisely UPP/LOW mm.
+const _n0len = Math.sqrt(1 + 0.25);
+const N0  = [ 1/_n0len, 0, -0.5/_n0len];  // right-side neutral
+const N0L = [-1/_n0len, 0, -0.5/_n0len];  // left-side neutral (mirror X)
 
 const UPP = 40, LOW = 38;  // segment lengths (mm)
 
@@ -741,12 +742,26 @@ function drawRobot() {
   RCTX.fillStyle = '#080810';
   RCTX.fillRect(0, 0, CW, CH);
 
-  // ── body position: fixed (robot held in space) ───────────────────────────
-  // Body stays level at a constant height so legs move purely from servo
-  // commands — no reactive physics. Good clean baseline for tuning animations.
+  // ── body position: level + height compensation ───────────────────────────
+  // Body stays perfectly level (pitch=roll=0, as if held) but rises/drops so
+  // the lowest foot always just touches the floor (world Z = 0).
+  // With no tilt, world_z = BDY.cz + body_frame_z, so:
+  //   BDY.cz = -min(foot_body_z)  ← lowest foot sits exactly at Z=0
+  // Belly constraint: BDY.cz must be at least BDY.h/2 so body doesn't clip floor.
   state.pitch = 0;
   state.roll  = 0;
-  BDY.cz = 72;  // mm above floor — chosen so STAND pose feet sit at ~floor level
+
+  // Compute body-frame foot Z for all legs (rotation preserves segment lengths).
+  const bfFootZ = LEGS.map(leg => {
+    const ud = rotY(leg.dir0, leg.hipFn(state.servos[leg.hs]));
+    const ld = rotY(ud,       leg.kneeFn(state.servos[leg.ks]));
+    const [,, mz] = leg.mount;
+    return mz + ud[2]*UPP + ld[2]*LOW;
+  });
+
+  const footFloor  = Math.max(...bfFootZ.map(fz => -fz)); // constraint from lowest foot
+  const bellyFloor = BDY.h / 2;                           // constraint from belly bottom
+  BDY.cz += (Math.max(footFloor, bellyFloor) - BDY.cz) * 0.35; // smooth tracking
 
   // Compute world-space leg geometry for drawing.
   const legs = LEGS.map(computeLeg);
