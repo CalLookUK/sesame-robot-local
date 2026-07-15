@@ -697,7 +697,7 @@ function computeLeg(leg) {
   const knee = bodyToWorld(kbx, kby, kbz);
   const foot = bodyToWorld(fbx, fby, fbz);
 
-  return { hip, knee, foot, grounded: foot[2] <= 30 };
+  return { hip, knee, foot, grounded: foot[2] <= 8 };
 }
 
 // ── Drawing helpers ──────────────────────────────────────────────────────────
@@ -742,26 +742,38 @@ function drawRobot() {
   RCTX.fillStyle = '#080810';
   RCTX.fillRect(0, 0, CW, CH);
 
-  // ── body position: level + height compensation ───────────────────────────
-  // Body stays perfectly level (pitch=roll=0, as if held) but rises/drops so
-  // the lowest foot always just touches the floor (world Z = 0).
-  // With no tilt, world_z = BDY.cz + body_frame_z, so:
-  //   BDY.cz = -min(foot_body_z)  ← lowest foot sits exactly at Z=0
-  // Belly constraint: BDY.cz must be at least BDY.h/2 so body doesn't clip floor.
-  state.pitch = 0;
-  state.roll  = 0;
-
-  // Compute body-frame foot Z for all legs (rotation preserves segment lengths).
-  const bfFootZ = LEGS.map(leg => {
+  // ── body dynamics ─────────────────────────────────────────────────────────
+  // Step 1: feet in body frame — independent of pitch/roll/BDY.cz (no circular dep).
+  const bfFeet = LEGS.map(leg => {
     const ud = rotY(leg.dir0, leg.hipFn(state.servos[leg.hs]));
     const ld = rotY(ud,       leg.kneeFn(state.servos[leg.ks]));
-    const [,, mz] = leg.mount;
-    return mz + ud[2]*UPP + ld[2]*LOW;
+    const [mx, my, mz] = leg.mount;
+    return [mx + ud[0]*UPP + ld[0]*LOW,
+            my + ud[1]*UPP + ld[1]*LOW,
+            mz + ud[2]*UPP + ld[2]*LOW];
   });
 
-  const footFloor  = Math.max(...bfFootZ.map(fz => -fz)); // constraint from lowest foot
-  const bellyFloor = BDY.h / 2;                           // constraint from belly bottom
-  BDY.cz += (Math.max(footFloor, bellyFloor) - BDY.cz) * 0.35; // smooth tracking
+  // Step 2: which feet define the support plane?
+  //   Gait mode → explicit stance flags. Otherwise → all 4 feet.
+  const groundedBF = state.gait.active
+    ? bfFeet.filter((_, i) => state.gait.legIsStance[i])
+    : bfFeet;
+  const supportBF = groundedBF.length >= 1 ? groundedBF : bfFeet;
+
+  // Step 3: fit plane to support feet in body frame → target pitch & roll.
+  const n = fitPlane(supportBF);
+  const cl = v => Math.max(-0.4, Math.min(0.4, v));
+  state.pitch += (cl( Math.atan2(n[0], n[2])) - state.pitch) * 0.18;
+  state.roll  += (cl(-Math.atan2(n[1], n[2])) - state.roll)  * 0.18;
+
+  // Step 4: height solve — raise body so every support foot lands at world Z = 0.
+  //   world_z = BDY.cz + rotX(rotY(p, pitch), roll)[2]
+  //   → BDY.cz = max(-rotX(rotY(p, pitch), roll)[2]) over contact points.
+  const belly = [[-BDY.w/2,-BDY.d/2,-BDY.h/2],[BDY.w/2,-BDY.d/2,-BDY.h/2],
+                 [ BDY.w/2, BDY.d/2,-BDY.h/2],[-BDY.w/2, BDY.d/2,-BDY.h/2]];
+  const contactPts = [...supportBF, ...belly];
+  const targetCz = Math.max(...contactPts.map(p => -rotX(rotY(p, state.pitch), state.roll)[2]));
+  BDY.cz += (targetCz - BDY.cz) * 0.35;
 
   // Compute world-space leg geometry for drawing.
   const legs = LEGS.map(computeLeg);
