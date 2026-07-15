@@ -1278,6 +1278,77 @@ function fwApplyServos(servos) {
   }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// GRAVITY PHYSICS SOLVER
+// ─────────────────────────────────────────────────────────────────────────────
+// Given foot positions in body frame (from FK) and which feet are in stance,
+// computes the body's Z height, pitch, and roll so that all stance feet
+// exactly touch the floor (world Z = 0).
+//
+// The constraint for each stance foot (linearised for small angles):
+//   BDY.cz + foot_bz − pitch × foot_bx + roll × foot_by = 0
+//
+// → overdetermined with 3+ feet (least-squares), underdetermined with <3
+//   (Tikhonov regularisation: gravity resists tilt, body prefers upright).
+
+function _solve3x3(A, b) {
+  // Gaussian elimination with partial pivoting on augmented [A|b]
+  const M = A.map((r, i) => [...r, b[i]]);
+  for (let c = 0; c < 3; c++) {
+    let mx = c;
+    for (let r = c + 1; r < 3; r++) if (Math.abs(M[r][c]) > Math.abs(M[mx][c])) mx = r;
+    [M[c], M[mx]] = [M[mx], M[c]];
+    if (Math.abs(M[c][c]) < 1e-12) continue;
+    for (let r = c + 1; r < 3; r++) {
+      const f = M[r][c] / M[c][c];
+      for (let k = c; k <= 3; k++) M[r][k] -= f * M[c][k];
+    }
+  }
+  const x = [0, 0, 0];
+  for (let i = 2; i >= 0; i--) {
+    x[i] = M[i][3];
+    for (let j = i + 1; j < 3; j++) x[i] -= M[i][j] * x[j];
+    x[i] /= M[i][i] || 1;
+  }
+  return x; // [cz, pitch_rad, roll_rad]
+}
+
+function solveBodyGravity(footBodies, stanceFlags) {
+  // Build normal equations A^T A x = A^T b
+  const AtA = [[0,0,0],[0,0,0],[0,0,0]];
+  const Atb = [0, 0, 0];
+  let nStance = 0;
+
+  for (let i = 0; i < 4; i++) {
+    if (!stanceFlags[i]) continue;
+    nStance++;
+    const [fbx, fby, fbz] = footBodies[i];
+    // row: [1, -fbx, fby], rhs: -fbz
+    const row = [1, -fbx, fby];
+    const rhs = -fbz;
+    for (let j = 0; j < 3; j++) {
+      Atb[j] += row[j] * rhs;
+      for (let k = 0; k < 3; k++) AtA[j][k] += row[j] * row[k];
+    }
+  }
+
+  if (nStance === 0) return { cz: 66, pitch: 0, roll: 0 };
+
+  // Tikhonov regularisation on pitch (index 1) and roll (index 2).
+  // λ ≈ 500 means a 1mm height deviation costs the same as ~0.045 rad (2.6°) of tilt,
+  // so the solver strongly prefers keeping feet on the floor over staying upright.
+  const lambda = 500;
+  AtA[1][1] += lambda;
+  AtA[2][2] += lambda;
+
+  const [cz, pitch, roll] = _solve3x3(AtA, Atb);
+  return {
+    cz:    Math.max(20, Math.min(90, cz)),
+    pitch: Math.max(-0.35, Math.min(0.35, pitch)),
+    roll:  Math.max(-0.35, Math.min(0.35, roll)),
+  };
+}
+
 function fwTick(ts) {
   if (!FW.active) return;
   const dt = Math.min((ts - FW.lastTS) / 1000, 0.05);
@@ -1306,7 +1377,7 @@ function fwTick(ts) {
   const nxt = FW_FRAMES[fwNextIdx(FW.frameIdx)];
   const servos = fwLerp(cur, nxt, FW.frameT);
 
-  // Derive body XY from stance feet (FK inverse)
+  // Body XY from stance feet (FK inverse, flat-body approximation)
   let sx = 0, sy = 0, sc = 0;
   for (let i = 0; i < 4; i++) {
     if (FW.stance[i]) {
@@ -1317,6 +1388,13 @@ function fwTick(ts) {
     }
   }
   if (sc > 0) { FW.bodyX = sx / sc; FW.bodyY = sy / sc; }
+
+  // Body Z + pitch + roll from gravity physics (stance feet must touch floor)
+  const footBodies = LEGS.map((_, i) => fwFootBody(i, servos));
+  const { cz, pitch, roll } = solveBodyGravity(footBodies, FW.stance);
+  BDY.cz   = cz;
+  state.pitch = pitch;
+  state.roll  = roll;
 
   fwApplyServos(servos);
   BDY.cx = FW.bodyX; BDY.cy = FW.bodyY;
@@ -1369,6 +1447,7 @@ function stopGait() {
     if (vl) vl.textContent = Math.round(v) + '°';
   });
   BDY.cx = 0; BDY.cy = 0; cam.x = 0; cam.y = 0;
+  BDY.cz = 66; state.pitch = 0; state.roll = 0;
   drawRobot();
   logLine('⏹ walk stopped');
 }
