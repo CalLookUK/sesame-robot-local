@@ -493,7 +493,12 @@ let state = {
   face:'idle', faceMode:'loop', faceFrameIdx:0, faceDir:1,
   faceFrameTimer:null, animTimer:null, animName:null, speed:1.0,
   pitch: 0, roll: 0,   // body orientation (radians); updated each frame
+  frame: 0,            // draw-frame counter
+  legChanged: [0,0,0,0], // frame each leg's servos were last set (FR,FL,BR,BL)
 };
+// Which servo name belongs to which leg index (FR=0, FL=1, BR=2, BL=3)
+const SERVO_LEG = {R1:0,R2:0, L1:1,L2:1, R4:2,R3:2, L4:3,L3:3};
+const STANCE_FRAMES = 6; // frames of servo silence before a leg is considered grounded
 
 // ─────────────────────────────────────────────────────────────────────────────
 // OLED
@@ -724,10 +729,10 @@ function drawRobot() {
             mz + ud[2]*UPP + ld[2]*LOW];
   });
 
-  // Support set: feet within 25 mm of the body-frame lowest point.
-  const bfZ    = bfFeet.map(f => f[2]);
-  const minBFZ = Math.min(...bfZ);
-  const supportBF = bfFeet.filter(f => f[2] <= minBFZ + 25);
+  // Support set: stance legs (servos stable ≥ STANCE_FRAMES) define the ground.
+  // Swing legs (recently changed) are excluded so the body doesn't follow them up.
+  const stance = bfFeet.filter((_, i) => state.frame - state.legChanged[i] >= STANCE_FRAMES);
+  const supportBF = stance.length >= 1 ? stance : bfFeet;
 
   // Fit plane in body frame → target pitch and roll.
   // bodyToWorld applies rotY(pitch) then rotX(roll). For the rotated body-frame
@@ -909,6 +914,8 @@ function buildServoPanel() {
 }
 
 function setServo(n, v) {
+  if (Math.abs(state.servos[n] - v) > 0.5 && SERVO_LEG[n] !== undefined)
+    state.legChanged[SERVO_LEG[n]] = state.frame;
   state.servos[n] = v;
   const sl = document.getElementById('sv-'+n), vl = document.getElementById('sv-val-'+n);
   if (sl) sl.value = v;
