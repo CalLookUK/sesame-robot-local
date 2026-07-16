@@ -1351,7 +1351,7 @@ function solveBodyGravity(footBodies, stanceFlags, comBody) {
 
     const [cz, pitch, roll] = _solveContact(footBodies, active);
 
-    if (cz < 5 || cz > 120) continue;
+    if (cz < BDY.h/2 || cz > 120) continue; // body bottom must stay at or above floor
     if (Math.abs(pitch) > 0.6 || Math.abs(roll) > 0.6) continue;
 
     // No foot may penetrate the floor
@@ -1359,6 +1359,17 @@ function solveBodyGravity(footBodies, stanceFlags, comBody) {
     for (let i = 0; i < 4; i++) {
       const [bx, by, bz] = footBodies[i];
       if (cz + bz - bx*pitch + by*roll < -2) { valid = false; break; }
+    }
+    if (!valid) continue;
+
+    // No body corner may penetrate the floor (body is a solid box)
+    const hw = BDY.w/2, hd = BDY.d/2, hh = BDY.h/2;
+    for (const cx of [-hw, hw]) {
+      for (const cy of [-hd, hd]) {
+        const wz = cz + (-hh) - cx*pitch + cy*roll; // bottom face corners
+        if (wz < 0) { valid = false; break; }
+      }
+      if (!valid) break;
     }
     if (!valid) continue;
 
