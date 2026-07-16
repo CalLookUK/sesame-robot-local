@@ -1082,7 +1082,10 @@ function buildCmdGrid() {
   COMMANDS.forEach(c => {
     const btn = document.createElement('button');
     btn.className = 'cmd-btn'; btn.dataset.cmd = c.cmd; btn.textContent = c.label;
-    btn.addEventListener('click', () => playAnim(c.cmd));
+    btn.addEventListener('click', () => {
+      if (c.cmd === 'rest' && state.animName === 'rest') { playAnim('stand'); }
+      else playAnim(c.cmd);
+    });
     el.appendChild(btn);
   });
 }
@@ -1287,7 +1290,8 @@ function solveBodyGravity(footBodies, stanceFlags, comBody) {
     const [bx, by, bz] = footBodies[mandatory[0]];
     return { cz: Math.max(10, -bz), pitch: 0, roll: 0 };
   }
-  if (bestCz === Infinity) return { cz: 66, pitch: 0, roll: 0 };
+  // No foot can reach the floor — body rests on the ground
+  if (bestCz === Infinity) return { cz: BDY.h / 2, pitch: 0, roll: 0 };
   return { cz: bestCz, pitch: bestPitch, roll: bestRoll };
 }
 
