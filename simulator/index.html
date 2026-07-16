@@ -435,6 +435,30 @@ const ANIMATIONS = {
     { servos:{R4:45,R3:135,L3:0,L4:180},  delay:300 }, { servos:{R4:0,R3:180,L3:45,L4:135}, delay:300 },
     { servos:{R4:45,R3:135,L3:0,L4:180},  delay:300 }, { servos:{R4:0,R3:180,L3:45,L4:135}, delay:300 },
   ],
+  walk: [
+    { face:'walk', mode:'loop', delay:0 },
+    // Initial step: lift FR/BL into position
+    { servos:{R3:135,L3:45, R2:100,L1:25}, delay:WD },
+    // Cycle repeats: FR/BL step, then FL/BR step
+    { servos:{R3:135,L3:0},                delay:WD },
+    { servos:{L4:135,L2:90, R4:0,R1:180}, delay:WD },
+    { servos:{R2:45,L1:90},                delay:WD },
+    { servos:{R4:45,L4:180},               delay:WD },
+    { servos:{R3:180,L3:45, R2:90,L1:0},  delay:WD },
+    { servos:{L2:135,R1:90},               delay:WD },
+    { servos:{R3:135,L3:0},                delay:WD },
+    { servos:{L4:135,L2:90, R4:0,R1:180}, delay:WD },
+    { servos:{R2:45,L1:90},                delay:WD },
+    { servos:{R4:45,L4:180},               delay:WD },
+    { servos:{R3:180,L3:45, R2:90,L1:0},  delay:WD },
+    { servos:{L2:135,R1:90},               delay:WD },
+    { servos:{R3:135,L3:0},                delay:WD },
+    { servos:{L4:135,L2:90, R4:0,R1:180}, delay:WD },
+    { servos:{R2:45,L1:90},                delay:WD },
+    { servos:{R4:45,L4:180},               delay:WD },
+    { servos:{R3:180,L3:45, R2:90,L1:0},  delay:WD },
+    { servos:{L2:135,R1:90},               delay:WD },
+  ],
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -849,8 +873,8 @@ function drawRobot() {
 
   // ── gravity / contact overlay ────────────────────────────────────────────
   {
-    const stance  = detectStance();
     const fbodies = currentFootBodies();
+    const stance  = detectStance(fbodies);
 
     // Contact points: filled = on floor, open ring = in air
     LEGS.forEach((leg, i) => {
@@ -1081,6 +1105,8 @@ function setServos(obj, ms) {
     const ease = t < 0.5 ? 2*t*t : -1+(4-2*t)*t;
     Object.entries(to).forEach(([k, v]) => {
       const cur = from[k] + (v - from[k]) * ease;
+      if (Math.abs(cur - state.servos[k]) > 0.3 && SERVO_LEG[k] !== undefined)
+        state.legChanged[SERVO_LEG[k]] = state.frame;
       state.servos[k] = cur;
       const sl = document.getElementById('sv-'+k), vl = document.getElementById('sv-val-'+k);
       if (sl) sl.value = cur;
@@ -1166,6 +1192,7 @@ const COMMANDS = [
   {cmd:'shrug',    label:'🤷 Shrug'},
   {cmd:'dead',     label:'💀 Dead'},
   {cmd:'crab',     label:'🦀 Crab'},
+  {cmd:'walk',     label:'🚶 Walk'},
 ];
 
 function buildCmdGrid() {
@@ -1196,9 +1223,14 @@ function logLine(msg) {
 }
 function clearLog() { document.getElementById('step-log').innerHTML = ''; }
 
-// Detect stance for current state.servos (knee physAngle < threshold = on ground)
-function detectStance() {
-  return LEGS.map(leg => leg.kneeFn(state.servos[leg.ks]) < 0.18);
+// Detect stance: leg must not have moved recently AND foot must be near the floor.
+// Uses world-Z estimate (BDY.cz + bz ≤ 20mm) so horizontal legs aren't confused
+// with grounded ones, and moving legs are excluded while in motion.
+function detectStance(footBodies) {
+  return LEGS.map((leg, i) => {
+    if (state.frame - state.legChanged[i] < STANCE_FRAMES) return false;
+    return BDY.cz + footBodies[i][2] <= 20;
+  });
 }
 
 // Compute foot body-frame positions from current state.servos (flat-body approx)
@@ -1242,42 +1274,20 @@ function computeCoM() {
   return [wx/MASS_TOTAL, wy/MASS_TOTAL, wz/MASS_TOTAL];
 }
 
-// Apply gravity physics to a static pose: solves body Z/pitch/roll so stance
-// feet sit on the floor (Z=0). Call after updating state.servos for any pose.
+// Apply gravity physics: solves body Z/pitch/roll so stance feet sit on the floor.
+// Uses smoothed transitions to avoid jarring jumps during animation.
 function applyGravityPose() {
-  const stance = detectStance();
   const footBodies = currentFootBodies();
+  const stance = detectStance(footBodies);
   const comBody = computeCoM();
-  const mandatory = [0,1,2,3].filter(i => stance[i]);
-  const { cz, pitch, roll, active } = solveBodyGravity(footBodies, stance, comBody);
+  const { cz, pitch, roll } = solveBodyGravity(footBodies, stance, comBody);
 
-  // Post-solve stability: only for pure 2-stance-foot line support (e.g. freaky).
-  // Don't fire when optional contacts pad active to 2 — those are animation poses.
-  if (mandatory.length === 2 && active && active.length === 2 && comBody) {
-    const [com_wx, com_wy] = _comWorld(comBody, cz, pitch, roll);
-    const supportPts = active.map(i => {
-      const [bx, by, bz] = footBodies[i];
-      const v = rotX(rotY([bx, by, bz], pitch), roll);
-      return [BDY.cx + v[0], BDY.cy + v[1]];
-    });
-    if (!_ptInHull(com_wx, com_wy, supportPts)) {
-      // Compute tipping direction: normal to support line pointing toward CoM
-      const [ax, ay] = supportPts[0], [bx2, by2] = supportPts[1];
-      const dx = bx2-ax, dy = by2-ay, len = Math.sqrt(dx*dx+dy*dy) || 1;
-      let nx = -dy/len, ny = dx/len;
-      if (nx*(com_wx-ax) + ny*(com_wy-ay) < 0) { nx=-nx; ny=-ny; }
-      // +nx → body tips in world +X → pitch = +π/2 (right face hits floor)
-      // +ny → body tips in world +Y → roll  = -π/2 (front face hits floor)
-      state.pitch = nx * Math.PI/2;
-      state.roll  = -ny * Math.PI/2;
-      BDY.cz = Math.abs(nx)*BDY.w/2 + Math.abs(ny)*BDY.d/2;
-      return;
-    }
-  }
-
-  BDY.cz      = cz;
-  state.pitch = pitch;
-  state.roll  = roll;
+  // Smooth body height transitions (prevents snapping during fast animations).
+  // Rise faster than fall — gravity is slow, support is instant.
+  const alpha = cz > BDY.cz ? 0.35 : 0.20;
+  BDY.cz      = BDY.cz      * (1 - alpha) + cz    * alpha;
+  state.pitch = state.pitch * (1 - alpha) + pitch * alpha;
+  state.roll  = state.roll  * (1 - alpha) + roll  * alpha;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1399,9 +1409,8 @@ function solveBodyGravity(footBodies, stanceFlags, comBody) {
     if (czRaw < bestCz) { bestCz = czRaw; bestPitch = pitch; bestRoll = roll; bestActive = active; }
   }
 
-  // No valid contact solution — preserve current body height (animation-defined pose)
-  if (bestCz === Infinity) return { cz: BDY.cz, pitch: 0, roll: 0, active: [] };
-  // Clamp body bottom to floor level on the way out (not during candidate selection)
+  // No valid contact solution — let gravity slowly pull body toward floor
+  if (bestCz === Infinity) return { cz: Math.max(BDY.h/2, BDY.cz - 1.5), pitch: 0, roll: 0, active: [] };
   return { cz: Math.max(bestCz, BDY.h/2), pitch: bestPitch, roll: bestRoll, active: bestActive };
 }
 
@@ -1433,6 +1442,10 @@ Object.entries(STAND).forEach(([k, v]) => {
   if (sl) sl.value = v;
   if (vl) vl.textContent = Math.round(v) + '°';
 });
+// Solve initial body height directly (no smoothing) so STAND renders correctly
+{ const fb = currentFootBodies(); const st = detectStance(fb);
+  const { cz, pitch, roll } = solveBodyGravity(fb, st, computeCoM());
+  BDY.cz = cz; state.pitch = pitch; state.roll = roll; }
 setFace('idle', 'boomerang');
 drawRobot();
 </script>
