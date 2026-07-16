@@ -921,16 +921,16 @@ function _drawLeg(leg, name, isBack) {
   if (seg1) line(iso(...seg1[0]), iso(...seg1[1]), col, 1);
   if (seg2) line(iso(...seg2[0]), iso(...seg2[1]), col, 1);
 
-  // Joint dots — clamp Z to floor so dots don't go underground
+  // Joint dots — always draw, clamped to floor
   const hipW  = [leg.hip[0],  leg.hip[1],  Math.max(0, leg.hip[2])];
   const kneeW = [leg.knee[0], leg.knee[1], Math.max(0, leg.knee[2])];
   const footW = [leg.foot[0], leg.foot[1], Math.max(0, leg.foot[2])];
-  if (leg.hip[2]  >= 0) circle(iso(...hipW),  2.5, col);
-  if (leg.knee[2] >= 0) circle(iso(...kneeW), 2,   col);
+  circle(iso(...hipW),  2.5, col);
+  circle(iso(...kneeW), 2,   col);
   const footP = iso(...footW);
   if (leg.grounded) {
     circle(footP, 3, null, col, 1);
-  } else if (leg.foot[2] >= 0) {
+  } else {
     circle(footP, 2, col);
   }
 
@@ -1194,8 +1194,9 @@ function applyGravityPose() {
   const comBody = computeCoM();
   const { cz, pitch, roll, active } = solveBodyGravity(footBodies, stance, comBody);
 
-  // Post-solve stability: if CoM is outside the support polygon the robot tips over
-  if (active && active.length >= 2 && comBody) {
+  // Post-solve stability: only for degenerate 2-point (line) support.
+  // With 3+ contacts the geometric solver is authoritative; don't override it.
+  if (active && active.length === 2 && comBody) {
     const [com_wx, com_wy] = _comWorld(comBody, cz, pitch, roll);
     const supportPts = active.map(i => {
       const [bx, by, bz] = footBodies[i];
