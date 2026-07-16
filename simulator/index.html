@@ -611,7 +611,7 @@ function fitPlane(pts) {
 
 // ── Robot geometry (mm) ──────────────────────────────────────────────────────
 // Body centre in world space. Height auto-solves in drawRobot(); 66 = Stand target.
-const BDY = { cx:0, cy:0, cz:66, w:58, d:86, h:20 };
+const BDY = { cx:0, cy:0, cz:10, w:58, d:86, h:20 }; // cz=10 = floor for initial all-90° servo state
 
 // ── Mass model (grams) ───────────────────────────────────────────────────────
 const MASS = {
@@ -1369,11 +1369,10 @@ function _ptInHull(px, py, pts) {
 // Stance feet MUST contact; swing feet MAY contact if that lowers cz further.
 function solveBodyGravity(footBodies, stanceFlags, comBody) {
   const mandatory = [0,1,2,3].filter(i =>  stanceFlags[i]);
-  // Self-consistency: a leg can only provide floor support if its foot is
-  // currently at or within 1 mm of the floor (world Z = BDY.cz + bz ≤ 1).
-  // Using the previous frame's BDY.cz makes the contact set bootstrapping:
-  // as a leg extends toward the floor, it enters the pool and lifts the body.
-  const optional  = [0,1,2,3].filter(i => !stanceFlags[i] && BDY.cz + footBodies[i][2] <= 1);
+  // A non-stance foot can only provide floor support if it extends below the
+  // body's own bottom face (bz ≤ -BDY.h/2). Horizontal legs (bz ≈ -8) sit
+  // flush with the body bottom and cannot push against the floor from below.
+  const optional  = [0,1,2,3].filter(i => !stanceFlags[i] && footBodies[i][2] <= -BDY.h/2);
 
   let bestCz = Infinity, bestPitch = 0, bestRoll = 0, bestActive = null;
 
