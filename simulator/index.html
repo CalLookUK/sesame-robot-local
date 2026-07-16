@@ -663,6 +663,14 @@ function fitPlane(pts) {
 // Body centre in world space. Height auto-solves in drawRobot(); 66 = Stand target.
 const BDY = { cx:0, cy:0, cz:66, w:58, d:86, h:20 };
 
+// ── Mass model (grams) ───────────────────────────────────────────────────────
+const MASS = {
+  body:  120,   // chassis + PCB + battery
+  upper:   8,   // hip arm per leg
+  lower:  10,   // lower leg per leg
+};
+const MASS_TOTAL = MASS.body + 4 * (MASS.upper + MASS.lower); // 192 g
+
 // Neutral hip direction at servo=90°: purely horizontal outward.
 // Hip shafts point UP (Z axis) — they sweep in the horizontal X-Y plane.
 const N0  = [1, 0, 0];   // right-side neutral
@@ -999,20 +1007,46 @@ function drawRobot() {
       if (sPts.length >= 3) { RCTX.fillStyle = 'rgba(80,200,255,0.06)'; RCTX.fill(); }
     }
 
-    // CoM floor projection (yellow dot)
-    const com = iso(BDY.cx, BDY.cy, 0);
-    RCTX.strokeStyle = 'rgba(255,220,0,0.8)'; RCTX.lineWidth = 1.5;
-    RCTX.beginPath(); RCTX.arc(com[0], com[1], 4, 0, 6.2832); RCTX.stroke();
-    RCTX.beginPath(); RCTX.moveTo(com[0]-8, com[1]); RCTX.lineTo(com[0]+8, com[1]);
-    RCTX.moveTo(com[0], com[1]-8); RCTX.lineTo(com[0], com[1]+8); RCTX.stroke();
+    // True CoM: world position from mass model
+    const comB = computeCoM();
+    const comW = bodyToWorld(comB[0], comB[1], comB[2]);
+    // Floor projection of CoM — colour by stability
+    const comFloorPt = iso(comW[0], comW[1], 0);
+    const stancePts  = LEGS.map((_, i) => stance[i] ? (() => {
+      const v = bodyToWorld(fbodies[i][0], fbodies[i][1], fbodies[i][2]);
+      return [v[0], v[1]];
+    })() : null).filter(Boolean);
+    const comStable  = _ptInHull(comW[0], comW[1], stancePts);
+    const comColour  = comStable ? 'rgba(60,255,120,0.9)' : 'rgba(255,60,60,0.9)';
+    RCTX.strokeStyle = comColour; RCTX.lineWidth = 1.5;
+    RCTX.beginPath(); RCTX.arc(comFloorPt[0], comFloorPt[1], 4, 0, 6.2832); RCTX.stroke();
+    RCTX.beginPath();
+    RCTX.moveTo(comFloorPt[0]-8, comFloorPt[1]); RCTX.lineTo(comFloorPt[0]+8, comFloorPt[1]);
+    RCTX.moveTo(comFloorPt[0], comFloorPt[1]-8); RCTX.lineTo(comFloorPt[0], comFloorPt[1]+8);
+    RCTX.stroke();
+    // 3-D CoM marker (small diamond at true world height)
+    const com3d = iso(comW[0], comW[1], comW[2]);
+    RCTX.strokeStyle = comColour; RCTX.lineWidth = 1;
+    RCTX.beginPath();
+    RCTX.moveTo(com3d[0], com3d[1]-5); RCTX.lineTo(com3d[0]+4, com3d[1]);
+    RCTX.lineTo(com3d[0], com3d[1]+5); RCTX.lineTo(com3d[0]-4, com3d[1]);
+    RCTX.closePath(); RCTX.stroke();
+    // Vertical drop line from 3-D CoM to floor projection
+    RCTX.strokeStyle = comColour.replace('0.9','0.25'); RCTX.lineWidth = 1;
+    RCTX.setLineDash([2,3]);
+    RCTX.beginPath(); RCTX.moveTo(com3d[0], com3d[1]); RCTX.lineTo(comFloorPt[0], comFloorPt[1]); RCTX.stroke();
+    RCTX.setLineDash([]);
 
     // HUD: gravity state
-    const stNames = LEGS.filter((_, i) => stance[i]).map(l => l.name).join('+') || 'none';
+    const stNames  = LEGS.filter((_, i) => stance[i]).map(l => l.name).join('+') || 'none';
     const pitchDeg = (state.pitch * 180 / Math.PI).toFixed(1);
     const rollDeg  = (state.roll  * 180 / Math.PI).toFixed(1);
+    const stabStr  = comStable ? 'stable' : 'TIPPING';
     RCTX.font = '9px monospace'; RCTX.textAlign = 'left';
-    RCTX.fillStyle = 'rgba(80,200,255,0.85)';
-    RCTX.fillText(`GRAV  stance:${stNames}  cz:${Math.round(BDY.cz)}  pitch:${pitchDeg}°  roll:${rollDeg}°`, 10, 14);
+    RCTX.fillStyle = comStable ? 'rgba(80,200,255,0.85)' : 'rgba(255,100,100,0.9)';
+    RCTX.fillText(
+      `GRAV  stance:${stNames}  cz:${Math.round(BDY.cz)}  pitch:${pitchDeg}°  roll:${rollDeg}°  ${MASS_TOTAL}g  ${stabStr}`,
+      10, 14);
   }
 
   // ── axes legend (small, bottom-right corner) ─────────────────────────────
@@ -1327,13 +1361,41 @@ function currentFootBodies() {
   });
 }
 
+// Compute centre of mass in body frame from current state.servos.
+// Body contributes at (0,0,0); each leg segment contributes at its centroid.
+function computeCoM() {
+  let wx = 0, wy = 0, wz = 0;
+  for (let i = 0; i < 4; i++) {
+    const leg = LEGS[i];
+    const hipA  = leg.hipFn(state.servos[leg.hs]);
+    const physA = leg.kneeFn(state.servos[leg.ks]);
+    const [mx, my, mz] = leg.mount;
+    const ud = rotZ(leg.dir0, hipA);
+    // Upper arm centroid: mount + ud*(upp/2), same Z as mount
+    const ucx = mx + ud[0]*(leg.upp/2), ucy = my + ud[1]*(leg.upp/2), ucz = mz;
+    // Knee position
+    const kbx = mx + ud[0]*leg.upp, kby = my + ud[1]*leg.upp;
+    // Lower leg centroid: knee + half lower-leg direction
+    const sp = Math.sin(physA), cp = Math.cos(physA);
+    const lcx = kbx + ud[0]*sp*(leg.low/2);
+    const lcy = kby + ud[1]*sp*(leg.low/2);
+    const lcz = mz - cp*(leg.low/2);
+    wx += MASS.upper*ucx + MASS.lower*lcx;
+    wy += MASS.upper*ucy + MASS.lower*lcy;
+    wz += MASS.upper*ucz + MASS.lower*lcz;
+  }
+  // body mass at (0,0,0) adds zero to numerator
+  return [wx/MASS_TOTAL, wy/MASS_TOTAL, wz/MASS_TOTAL];
+}
+
 // Apply gravity physics to a static pose: solves body Z/pitch/roll so stance
 // feet sit on the floor (Z=0). Call after updating state.servos for any pose.
 function applyGravityPose() {
   if (FW.active || CG.active) return; // gaits manage their own body pose
   const stance = detectStance();
   const footBodies = currentFootBodies();
-  const { cz, pitch, roll } = solveBodyGravity(footBodies, stance);
+  const comBody = computeCoM();
+  const { cz, pitch, roll } = solveBodyGravity(footBodies, stance, comBody);
   BDY.cz      = cz;
   state.pitch = pitch;
   state.roll  = roll;
@@ -1400,49 +1462,85 @@ function _solveContact(footBodies, active) {
   return _solve3x3(AtA, Atb);
 }
 
+// True CoM in world XY for a given solved pose (used for support polygon check).
+function _comWorld(comBody, cz, pitch, roll) {
+  const [cbx, cby, cbz] = comBody;
+  const v = rotX(rotY([cbx, cby, cbz], pitch), roll);
+  return [BDY.cx + v[0], BDY.cy + v[1]]; // world XY only
+}
+
+// Is point (px,py) inside the convex hull of pts [[x,y]...]? 5 mm inner margin.
+function _ptInHull(px, py, pts) {
+  if (pts.length < 2) return true;
+  if (pts.length === 2) {
+    // Degenerate: line support. CoM must project onto the segment.
+    const [ax,ay] = pts[0], [bx,by] = pts[1];
+    const dx = bx-ax, dy = by-ay, len2 = dx*dx+dy*dy;
+    if (len2 < 1) return true;
+    const t = ((px-ax)*dx + (py-ay)*dy) / len2;
+    return t >= -0.05 && t <= 1.05; // allow 5% overhang on line
+  }
+  // Sort points CCW around centroid, then test each edge.
+  const cx = pts.reduce((s,p)=>s+p[0],0)/pts.length;
+  const cy = pts.reduce((s,p)=>s+p[1],0)/pts.length;
+  const sorted = [...pts].sort((a,b)=>
+    Math.atan2(a[1]-cy,a[0]-cx) - Math.atan2(b[1]-cy,b[0]-cx));
+  for (let i = 0; i < sorted.length; i++) {
+    const [ax,ay] = sorted[i], [bx,by] = sorted[(i+1)%sorted.length];
+    const cross = (bx-ax)*(py-ay) - (by-ay)*(px-ax);
+    if (cross < -5) return false; // 5 mm margin — clearly outside this edge
+  }
+  return true;
+}
+
 // Gravity physics: find the minimum-cz body pose (lowest = gravity wins) where
-// no foot penetrates the floor.  Stance feet (knee down) MUST be on the floor;
-// swing feet MAY touch the floor if that lets the body descend further.
-//
-// Approach: enumerate all contact subsets that include the mandatory (stance) feet,
-// solve each 3x3 constraint system, keep the valid solution with lowest cz.
-function solveBodyGravity(footBodies, stanceFlags) {
+// no foot penetrates the floor AND the CoM projects inside the support polygon.
+// Stance feet MUST contact; swing feet MAY contact if that lowers cz further.
+function solveBodyGravity(footBodies, stanceFlags, comBody) {
   const mandatory = [0,1,2,3].filter(i =>  stanceFlags[i]);
   const optional  = [0,1,2,3].filter(i => !stanceFlags[i]);
 
   let bestCz = Infinity, bestPitch = 0, bestRoll = 0;
 
-  // Try every subset of optional feet added to the mandatory set
   for (let mask = 0; mask < (1 << optional.length); mask++) {
     const active = [...mandatory];
     for (let b = 0; b < optional.length; b++) {
       if (mask & (1 << b)) active.push(optional[b]);
     }
-    if (active.length < 3) continue; // need ≥3 contacts for a unique solution
+    if (active.length < 3) continue;
 
     const [cz, pitch, roll] = _solveContact(footBodies, active);
 
-    // Reject degenerate or out-of-range solutions
     if (cz < 5 || cz > 120) continue;
     if (Math.abs(pitch) > 0.6 || Math.abs(roll) > 0.6) continue;
 
-    // All four feet must be at or above the floor (no penetration)
+    // No foot may penetrate the floor
     let valid = true;
     for (let i = 0; i < 4; i++) {
       const [bx, by, bz] = footBodies[i];
-      if (cz + bz - bx * pitch + by * roll < -2) { valid = false; break; }
+      if (cz + bz - bx*pitch + by*roll < -2) { valid = false; break; }
+    }
+    if (!valid) continue;
+
+    // CoM world XY must lie within the support polygon (convex hull of active feet)
+    if (comBody) {
+      const [com_wx, com_wy] = _comWorld(comBody, cz, pitch, roll);
+      const supportPts = active.map(i => {
+        const [bx,by,bz] = footBodies[i];
+        const v = rotX(rotY([bx,by,bz], pitch), roll);
+        return [BDY.cx+v[0], BDY.cy+v[1]];
+      });
+      if (!_ptInHull(com_wx, com_wy, supportPts)) continue;
     }
 
-    if (valid && cz < bestCz) { bestCz = cz; bestPitch = pitch; bestRoll = roll; }
+    if (cz < bestCz) { bestCz = cz; bestPitch = pitch; bestRoll = roll; }
   }
 
-  // Fallback: body rests on its lowest stance foot
   if (bestCz === Infinity && mandatory.length > 0) {
     const [bx, by, bz] = footBodies[mandatory[0]];
     return { cz: Math.max(10, -bz), pitch: 0, roll: 0 };
   }
   if (bestCz === Infinity) return { cz: 66, pitch: 0, roll: 0 };
-
   return { cz: bestCz, pitch: bestPitch, roll: bestRoll };
 }
 
