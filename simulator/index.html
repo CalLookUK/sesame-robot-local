@@ -485,11 +485,34 @@ function setFace(name, mode) {
   _renderFaceFrame(); _scheduleFaceFrame();
 }
 
-function _renderFaceFrame() {
+function _currentFaceBitmap() {
   const frames = FACE_FRAMES[state.face] || [];
   const f = frames[state.faceFrameIdx];
-  if (f) renderFaceBitmap(f.replace('epd_bitmap_',''));
-  else { oledCtx.fillStyle='#000'; oledCtx.fillRect(0,0,384,192); }
+  if (f && BITMAPS[f] && BITMAPS[f].length >= 1024) return BITMAPS[f];
+  // Fall back to idle
+  const idle = FACE_FRAMES['idle'] || [];
+  const fi = idle[0];
+  return (fi && BITMAPS[fi] && BITMAPS[fi].length >= 1024) ? BITMAPS[fi] : null;
+}
+
+function _renderFaceFrame() {
+  const data = _currentFaceBitmap();
+  if (data) {
+    oledCtx.fillStyle = '#000';
+    oledCtx.fillRect(0, 0, 384, 192);
+    const img = oledCtx.createImageData(384, 192);
+    const d = img.data;
+    for (let y = 0; y < 64; y++) {
+      for (let x = 0; x < 128; x++) {
+        const bit = (data[y*16 + (x>>3)] >> (7-(x&7))) & 1;
+        for (let sy = 0; sy < 3; sy++) for (let sx = 0; sx < 3; sx++) {
+          const i = ((y*3+sy)*384 + (x*3+sx)) * 4;
+          d[i]=0; d[i+1]=bit?224:8; d[i+2]=0; d[i+3]=255;
+        }
+      }
+    }
+    oledCtx.putImageData(img, 0, 0);
+  }
 }
 
 function _scheduleFaceFrame() {
@@ -953,9 +976,7 @@ function _drawLeg(leg, name, isBack) {
 }
 
 function _drawOledOverlay() {
-  const frames = FACE_FRAMES[state.face] || [];
-  const f = frames[state.faceFrameIdx];
-  const data = f ? BITMAPS[f] : null;
+  const data = _currentFaceBitmap();
   const OW = 128, OH = 64, PAD = 2;
   const ox = PAD + 1, oy = CH - OH - PAD - 1;
   // Background + border
@@ -1351,7 +1372,7 @@ function solveBodyGravity(footBodies, stanceFlags, comBody) {
 
     const [cz, pitch, roll] = _solveContact(footBodies, active);
 
-    if (cz < BDY.h/2 || cz > 120) continue; // body bottom must stay at or above floor
+    if (cz < 1 || cz > 120) continue;
     if (Math.abs(pitch) > 0.6 || Math.abs(roll) > 0.6) continue;
 
     // No foot may penetrate the floor
@@ -1362,22 +1383,11 @@ function solveBodyGravity(footBodies, stanceFlags, comBody) {
     }
     if (!valid) continue;
 
-    // No body corner may penetrate the floor (body is a solid box)
-    const hw = BDY.w/2, hd = BDY.d/2, hh = BDY.h/2;
-    for (const cx of [-hw, hw]) {
-      for (const cy of [-hd, hd]) {
-        const wz = cz + (-hh) - cx*pitch + cy*roll; // bottom face corners
-        if (wz < 0) { valid = false; break; }
-      }
-      if (!valid) break;
-    }
-    if (!valid) continue;
-
     if (cz < bestCz) { bestCz = cz; bestPitch = pitch; bestRoll = roll; bestActive = active; }
   }
 
-  // No valid contact solution — body falls to the ground
-  if (bestCz === Infinity) return { cz: BDY.h / 2, pitch: 0, roll: 0, active: [] };
+  // No valid contact solution — preserve current body height (animation-defined pose)
+  if (bestCz === Infinity) return { cz: BDY.cz, pitch: 0, roll: 0, active: [] };
   return { cz: bestCz, pitch: bestPitch, roll: bestRoll, active: bestActive };
 }
 
