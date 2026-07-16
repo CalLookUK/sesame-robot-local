@@ -1369,9 +1369,11 @@ function _ptInHull(px, py, pts) {
 // Stance feet MUST contact; swing feet MAY contact if that lowers cz further.
 function solveBodyGravity(footBodies, stanceFlags, comBody) {
   const mandatory = [0,1,2,3].filter(i =>  stanceFlags[i]);
-  // Legs whose foot is above the body centre (bz > 0) are raised and cannot
-  // support the body from below — exclude them from optional floor contacts.
-  const optional  = [0,1,2,3].filter(i => !stanceFlags[i] && footBodies[i][2] <= 0);
+  // Self-consistency: a leg can only provide floor support if its foot is
+  // currently at or within 1 mm of the floor (world Z = BDY.cz + bz ≤ 1).
+  // Using the previous frame's BDY.cz makes the contact set bootstrapping:
+  // as a leg extends toward the floor, it enters the pool and lifts the body.
+  const optional  = [0,1,2,3].filter(i => !stanceFlags[i] && BDY.cz + footBodies[i][2] <= 1);
 
   let bestCz = Infinity, bestPitch = 0, bestRoll = 0, bestActive = null;
 
