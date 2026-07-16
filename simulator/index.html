@@ -140,7 +140,14 @@ h1{
   line-height:1.3;
 }
 .cmd-btn:hover{border-color:var(--orange);color:var(--orange)}
-.cmd-btn.active{background:var(--orange);color:#000;border-color:var(--orange);font-weight:700}
+.cmd-btn.active{background:var(--orange);color:#000;border-color:var(--orange);font-weight:700;position:relative;padding-top:14px}
+.cmd-btn.active::before{
+  content:'';position:absolute;top:4px;left:50%;transform:translateX(-50%);
+  width:8px;height:8px;border-radius:50%;
+  border:2px solid rgba(0,0,0,0.25);border-top-color:#000;
+  animation:spin .6s linear infinite;
+}
+@keyframes spin{to{transform:translateX(-50%) rotate(360deg)}}
 
 /* ── controls ── */
 .controls{display:flex;align-items:center;gap:8px;margin-top:8px;flex-wrap:wrap}
