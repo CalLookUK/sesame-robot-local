@@ -181,9 +181,9 @@ h1{
 
 /* ── col stacks — both stretch to full grid height ── */
 .right-col,.left-col{display:flex;flex-direction:column;gap:10px;align-self:stretch}
-/* Terminal fills leftover left-col space; 3D view fills leftover right-col space */
-.left-col .panel:last-child{flex:1;display:flex;flex-direction:column}
-.left-col .panel:last-child #step-log{flex:1;max-height:none;overflow-y:auto}
+/* Terminal capped; 3D view fills leftover right-col space */
+.left-col .panel:last-child{display:flex;flex-direction:column}
+.left-col .panel:last-child #step-log{max-height:120px;overflow-y:auto}
 #robot-wrap{flex:1;display:flex;align-items:center;justify-content:center}
 .right-col .panel:first-child{flex:1;display:flex;flex-direction:column}
 </style>
