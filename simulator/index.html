@@ -337,7 +337,6 @@ const ANIMATIONS = {
     { servos:{L3:180}, delay:300 }, { servos:{L3:100}, delay:300 },
     { servos:{L3:180}, delay:300 }, { servos:{L3:100}, delay:300 },
     { servos:{L3:180}, delay:300 }, { servos:{L3:100}, delay:300 },
-    { face:'stand', mode:'once', servos:STAND, delay:0 },
   ],
   dance: [
     { face:'dance', mode:'loop', delay:0 },
@@ -347,7 +346,6 @@ const ANIMATIONS = {
     { servos:{R4:115,R3:115,L3:10,L4:10},  delay:300 }, { servos:{R4:160,R3:160,L3:65,L4:65},  delay:300 },
     { servos:{R4:115,R3:115,L3:10,L4:10},  delay:300 }, { servos:{R4:160,R3:160,L3:65,L4:65},  delay:300 },
     { servos:{R4:115,R3:115,L3:10,L4:10},  delay:300 }, { servos:{R4:160,R3:160,L3:65,L4:65},  delay:300 },
-    { face:'stand', mode:'once', servos:STAND, delay:0 },
   ],
   swim: [
     { face:'swim', mode:'once', servos:REST, delay:0 },
@@ -355,12 +353,10 @@ const ANIMATIONS = {
     { servos:{R1:135,R2:45,L1:45,L2:135}, delay:400 }, { servos:{R1:90,R2:90,L1:90,L2:90}, delay:400 },
     { servos:{R1:135,R2:45,L1:45,L2:135}, delay:400 }, { servos:{R1:90,R2:90,L1:90,L2:90}, delay:400 },
     { servos:{R1:135,R2:45,L1:45,L2:135}, delay:400 }, { servos:{R1:90,R2:90,L1:90,L2:90}, delay:400 },
-    { face:'stand', mode:'once', servos:STAND, delay:0 },
   ],
   point: [
     { face:'point', mode:'boomerang', delay:0 },
     { servos:{L2:90,R1:135,R2:100,L4:180,L1:25,L3:145,R4:80,R3:170}, delay:2000 },
-    { face:'stand', mode:'once', servos:STAND, delay:0 },
   ],
   pushup: [
     { face:'pushup', mode:'once', servos:STAND, delay:200 },
@@ -369,13 +365,11 @@ const ANIMATIONS = {
     { servos:{L3:0,R3:180}, delay:600 }, { servos:{L3:90,R3:90}, delay:500 },
     { servos:{L3:0,R3:180}, delay:600 }, { servos:{L3:90,R3:90}, delay:500 },
     { servos:{L3:0,R3:180}, delay:600 }, { servos:{L3:90,R3:90}, delay:500 },
-    { face:'stand', mode:'once', servos:STAND, delay:0 },
   ],
   bow: [
     { face:'bow', mode:'once', servos:STAND, delay:200 },
     { servos:{L1:0,R1:180,L3:0,R3:180,L2:180,R2:0,R4:0,L4:180}, delay:600 },
     { servos:{L3:90,R3:90}, delay:3000 },
-    { face:'stand', mode:'once', servos:STAND, delay:0 },
   ],
   cute: [
     { face:'cute', mode:'once', servos:STAND, delay:200 },
@@ -385,7 +379,6 @@ const ANIMATIONS = {
     { servos:{R4:180,L4:45}, delay:300 }, { servos:{R4:135,L4:0}, delay:300 },
     { servos:{R4:180,L4:45}, delay:300 }, { servos:{R4:135,L4:0}, delay:300 },
     { servos:{R4:180,L4:45}, delay:300 }, { servos:{R4:135,L4:0}, delay:300 },
-    { face:'stand', mode:'once', servos:STAND, delay:0 },
   ],
   freaky: [
     { face:'freaky', mode:'once', servos:STAND, delay:200 },
@@ -393,7 +386,6 @@ const ANIMATIONS = {
     { servos:{R3:25}, delay:400 }, { servos:{R3:0}, delay:400 },
     { servos:{R3:25}, delay:400 }, { servos:{R3:0}, delay:400 },
     { servos:{R3:25}, delay:400 }, { servos:{R3:0}, delay:400 },
-    { face:'stand', mode:'once', servos:STAND, delay:0 },
   ],
   worm: [
     { face:'worm', mode:'once', servos:STAND, delay:200 },
@@ -403,7 +395,6 @@ const ANIMATIONS = {
     { servos:{R3:45,L3:135,R4:45,L4:135}, delay:300 }, { servos:{R3:135,L3:45,R4:135,L4:45}, delay:300 },
     { servos:{R3:45,L3:135,R4:45,L4:135}, delay:300 }, { servos:{R3:135,L3:45,R4:135,L4:45}, delay:300 },
     { servos:{R3:45,L3:135,R4:45,L4:135}, delay:300 }, { servos:{R3:135,L3:45,R4:135,L4:45}, delay:300 },
-    { face:'stand', mode:'once', servos:STAND, delay:0 },
   ],
   shake: [
     { face:'shake', mode:'once',
@@ -413,13 +404,11 @@ const ANIMATIONS = {
     { servos:{R4:45,L4:135}, delay:300 }, { servos:{R4:0,L4:180}, delay:300 },
     { servos:{R4:45,L4:135}, delay:300 }, { servos:{R4:0,L4:180}, delay:300 },
     { servos:{R4:45,L4:135}, delay:300 }, { servos:{R4:0,L4:180}, delay:300 },
-    { face:'stand', mode:'once', servos:STAND, delay:0 },
   ],
   shrug: [
     { servos:STAND, delay:200 },
     { face:'dead', mode:'once', servos:{...STAND,R3:90,R4:90,L3:90,L4:90}, delay:1000 },
     { face:'shrug', mode:'once', servos:{...STAND,R3:0,R4:180,L3:180,L4:0}, delay:1500 },
-    { face:'stand', mode:'once', servos:STAND, delay:0 },
   ],
   dead: [
     { servos:STAND, delay:200 },
@@ -433,7 +422,6 @@ const ANIMATIONS = {
     { servos:{R4:45,R3:135,L3:0,L4:180},  delay:300 }, { servos:{R4:0,R3:180,L3:45,L4:135}, delay:300 },
     { servos:{R4:45,R3:135,L3:0,L4:180},  delay:300 }, { servos:{R4:0,R3:180,L3:45,L4:135}, delay:300 },
     { servos:{R4:45,R3:135,L3:0,L4:180},  delay:300 }, { servos:{R4:0,R3:180,L3:45,L4:135}, delay:300 },
-    { face:'stand', mode:'once', servos:STAND, delay:0 },
   ],
 };
 
@@ -1038,8 +1026,18 @@ function playAnim(name) {
   runStep(seq);
 }
 
+const STAND_STEP = { face:'stand', mode:'once', servos:STAND, delay:500 };
+
 function runStep(seq) {
-  if (state.animStepIdx >= seq.length) { stopAnim(); logLine('✓ done'); return; }
+  if (state.animStepIdx >= seq.length) {
+    stopAnim();
+    if (state.animName !== 'stand' && state.animName !== 'rest' && state.animName !== 'dead') {
+      setFace('stand', 'once');
+      setServos(STAND, STAND_STEP.delay * 0.9 / state.speed);
+    }
+    logLine('✓ done');
+    return;
+  }
   const step = seq[state.animStepIdx++];
   logLine(`${state.animStepIdx}. ${descStep(step)}`);
   if (step.face) setFace(step.face, step.mode || 'loop');
