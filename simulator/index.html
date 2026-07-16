@@ -1248,11 +1248,12 @@ function applyGravityPose() {
   const stance = detectStance();
   const footBodies = currentFootBodies();
   const comBody = computeCoM();
+  const mandatory = [0,1,2,3].filter(i => stance[i]);
   const { cz, pitch, roll, active } = solveBodyGravity(footBodies, stance, comBody);
 
-  // Post-solve stability: only for degenerate 2-point (line) support.
-  // With 3+ contacts the geometric solver is authoritative; don't override it.
-  if (active && active.length === 2 && comBody) {
+  // Post-solve stability: only for pure 2-stance-foot line support (e.g. freaky).
+  // Don't fire when optional contacts pad active to 2 — those are animation poses.
+  if (mandatory.length === 2 && active && active.length === 2 && comBody) {
     const [com_wx, com_wy] = _comWorld(comBody, cz, pitch, roll);
     const supportPts = active.map(i => {
       const [bx, by, bz] = footBodies[i];
@@ -1370,9 +1371,10 @@ function solveBodyGravity(footBodies, stanceFlags, comBody) {
     }
     if (active.length < 2) continue;
 
-    const [cz, pitch, roll] = _solveContact(footBodies, active);
+    const [czRaw, pitch, roll] = _solveContact(footBodies, active);
+    const cz = Math.max(czRaw, BDY.h / 2); // body bottom must not go underground
 
-    if (cz < 1 || cz > 120) continue;
+    if (cz > 120) continue;
     if (Math.abs(pitch) > 0.6 || Math.abs(roll) > 0.6) continue;
 
     // No foot may penetrate the floor
