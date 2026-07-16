@@ -406,12 +406,10 @@ const ANIMATIONS = {
     { servos:{R4:45,L4:135}, delay:300 }, { servos:{R4:0,L4:180}, delay:300 },
   ],
   shrug: [
-    { servos:STAND, delay:200 },
     { face:'dead', mode:'once', servos:{...STAND,R3:90,R4:90,L3:90,L4:90}, delay:1000 },
     { face:'shrug', mode:'once', servos:{...STAND,R3:0,R4:180,L3:180,L4:0}, delay:1500 },
   ],
   dead: [
-    { servos:STAND, delay:200 },
     { face:'dead', mode:'boomerang', servos:{...STAND,R3:90,R4:90,L3:90,L4:90}, delay:0 },
   ],
   crab: [
