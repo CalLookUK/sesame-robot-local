@@ -1271,7 +1271,7 @@ function solveBodyGravity(footBodies, stanceFlags, comBody) {
     for (let b = 0; b < optional.length; b++) {
       if (mask & (1 << b)) active.push(optional[b]);
     }
-    if (active.length < 3) continue;
+    if (active.length < 2) continue;
 
     const [cz, pitch, roll] = _solveContact(footBodies, active);
 
