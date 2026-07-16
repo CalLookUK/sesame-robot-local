@@ -41,9 +41,11 @@ h1{
 .grid{
   display:grid;
   grid-template-columns:260px 1fr;
+  grid-auto-rows:1fr;
   gap:10px;
   max-width:900px;
   margin:0 auto;
+  align-items:stretch;
 }
 @media(max-width:660px){.grid{grid-template-columns:1fr}}
 .panel{
@@ -177,9 +179,13 @@ h1{
 }
 #step-log .cur{color:var(--orange)}
 
-/* ── right col stacks ── */
-.right-col{display:flex;flex-direction:column;gap:10px}
-.left-col{display:flex;flex-direction:column;gap:10px}
+/* ── col stacks — both stretch to full grid height ── */
+.right-col,.left-col{display:flex;flex-direction:column;gap:10px;align-self:stretch}
+/* Terminal fills leftover left-col space; 3D view fills leftover right-col space */
+.left-col .panel:last-child{flex:1;display:flex;flex-direction:column}
+.left-col .panel:last-child #step-log{flex:1;max-height:none;overflow-y:auto}
+#robot-wrap{flex:1;display:flex;align-items:center;justify-content:center}
+.right-col .panel:first-child{flex:1;display:flex;flex-direction:column}
 </style>
 </head>
 <body>
