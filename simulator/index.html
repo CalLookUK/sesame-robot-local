@@ -1369,7 +1369,9 @@ function _ptInHull(px, py, pts) {
 // Stance feet MUST contact; swing feet MAY contact if that lowers cz further.
 function solveBodyGravity(footBodies, stanceFlags, comBody) {
   const mandatory = [0,1,2,3].filter(i =>  stanceFlags[i]);
-  const optional  = [0,1,2,3].filter(i => !stanceFlags[i]);
+  // Legs whose foot is above the body centre (bz > 0) are raised and cannot
+  // support the body from below — exclude them from optional floor contacts.
+  const optional  = [0,1,2,3].filter(i => !stanceFlags[i] && footBodies[i][2] <= 0);
 
   let bestCz = Infinity, bestPitch = 0, bestRoll = 0, bestActive = null;
 
@@ -1381,25 +1383,25 @@ function solveBodyGravity(footBodies, stanceFlags, comBody) {
     if (active.length < 2) continue;
 
     const [czRaw, pitch, roll] = _solveContact(footBodies, active);
-    const cz = Math.max(czRaw, BDY.h / 2); // body bottom must not go underground
 
-    if (cz > 120) continue;
+    if (czRaw < 1 || czRaw > 120) continue;
     if (Math.abs(pitch) > 0.6 || Math.abs(roll) > 0.6) continue;
 
     // No foot may penetrate the floor
     let valid = true;
     for (let i = 0; i < 4; i++) {
       const [bx, by, bz] = footBodies[i];
-      if (cz + bz - bx*pitch + by*roll < -2) { valid = false; break; }
+      if (czRaw + bz - bx*pitch + by*roll < -2) { valid = false; break; }
     }
     if (!valid) continue;
 
-    if (cz < bestCz) { bestCz = cz; bestPitch = pitch; bestRoll = roll; bestActive = active; }
+    if (czRaw < bestCz) { bestCz = czRaw; bestPitch = pitch; bestRoll = roll; bestActive = active; }
   }
 
   // No valid contact solution — preserve current body height (animation-defined pose)
   if (bestCz === Infinity) return { cz: BDY.cz, pitch: 0, roll: 0, active: [] };
-  return { cz: bestCz, pitch: bestPitch, roll: bestRoll, active: bestActive };
+  // Clamp body bottom to floor level on the way out (not during candidate selection)
+  return { cz: Math.max(bestCz, BDY.h/2), pitch: bestPitch, roll: bestRoll, active: bestActive };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
