@@ -1261,7 +1261,16 @@ function applyGravityPose() {
       return [BDY.cx + v[0], BDY.cy + v[1]];
     });
     if (!_ptInHull(com_wx, com_wy, supportPts)) {
-      BDY.cz = BDY.h / 2; state.pitch = 0; state.roll = 0;
+      // Compute tipping direction: normal to support line pointing toward CoM
+      const [ax, ay] = supportPts[0], [bx2, by2] = supportPts[1];
+      const dx = bx2-ax, dy = by2-ay, len = Math.sqrt(dx*dx+dy*dy) || 1;
+      let nx = -dy/len, ny = dx/len;
+      if (nx*(com_wx-ax) + ny*(com_wy-ay) < 0) { nx=-nx; ny=-ny; }
+      // +nx → body tips in world +X → pitch = +π/2 (right face hits floor)
+      // +ny → body tips in world +Y → roll  = -π/2 (front face hits floor)
+      state.pitch = nx * Math.PI/2;
+      state.roll  = -ny * Math.PI/2;
+      BDY.cz = Math.abs(nx)*BDY.w/2 + Math.abs(ny)*BDY.d/2;
       return;
     }
   }
