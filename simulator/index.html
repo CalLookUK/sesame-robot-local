@@ -1178,7 +1178,22 @@ function applyGravityPose() {
   const stance = detectStance();
   const footBodies = currentFootBodies();
   const comBody = computeCoM();
-  const { cz, pitch, roll } = solveBodyGravity(footBodies, stance, comBody);
+  const { cz, pitch, roll, active } = solveBodyGravity(footBodies, stance, comBody);
+
+  // Post-solve stability: if CoM is outside the support polygon the robot tips over
+  if (active && active.length >= 2 && comBody) {
+    const [com_wx, com_wy] = _comWorld(comBody, cz, pitch, roll);
+    const supportPts = active.map(i => {
+      const [bx, by, bz] = footBodies[i];
+      const v = rotX(rotY([bx, by, bz], pitch), roll);
+      return [BDY.cx + v[0], BDY.cy + v[1]];
+    });
+    if (!_ptInHull(com_wx, com_wy, supportPts)) {
+      BDY.cz = BDY.h / 2; state.pitch = 0; state.roll = 0;
+      return;
+    }
+  }
+
   BDY.cz      = cz;
   state.pitch = pitch;
   state.roll  = roll;
@@ -1275,7 +1290,7 @@ function solveBodyGravity(footBodies, stanceFlags, comBody) {
   const mandatory = [0,1,2,3].filter(i =>  stanceFlags[i]);
   const optional  = [0,1,2,3].filter(i => !stanceFlags[i]);
 
-  let bestCz = Infinity, bestPitch = 0, bestRoll = 0;
+  let bestCz = Infinity, bestPitch = 0, bestRoll = 0, bestActive = null;
 
   for (let mask = 0; mask < (1 << optional.length); mask++) {
     const active = [...mandatory];
@@ -1297,12 +1312,12 @@ function solveBodyGravity(footBodies, stanceFlags, comBody) {
     }
     if (!valid) continue;
 
-    if (cz < bestCz) { bestCz = cz; bestPitch = pitch; bestRoll = roll; }
+    if (cz < bestCz) { bestCz = cz; bestPitch = pitch; bestRoll = roll; bestActive = active; }
   }
 
   // No valid contact solution — body falls to the ground
-  if (bestCz === Infinity) return { cz: BDY.h / 2, pitch: 0, roll: 0 };
-  return { cz: bestCz, pitch: bestPitch, roll: bestRoll };
+  if (bestCz === Infinity) return { cz: BDY.h / 2, pitch: 0, roll: 0, active: [] };
+  return { cz: bestCz, pitch: bestPitch, roll: bestRoll, active: bestActive };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
