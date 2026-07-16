@@ -1251,7 +1251,9 @@ function _ptInHull(px, py, pts) {
     const dx = bx-ax, dy = by-ay, len2 = dx*dx+dy*dy;
     if (len2 < 1) return true;
     const t = ((px-ax)*dx + (py-ay)*dy) / len2;
-    return t >= -0.05 && t <= 1.05; // allow 5% overhang on line
+    if (t < -0.05 || t > 1.05) return false;
+    const perpDist2 = ((px-ax)*dy - (py-ay)*dx) ** 2 / len2;
+    return perpDist2 <= 225; // within 15 mm of support line
   }
   // Sort points CCW around centroid, then test each edge.
   const cx = pts.reduce((s,p)=>s+p[0],0)/pts.length;
@@ -1295,25 +1297,10 @@ function solveBodyGravity(footBodies, stanceFlags, comBody) {
     }
     if (!valid) continue;
 
-    // CoM world XY must lie within the support polygon (convex hull of active feet)
-    if (comBody) {
-      const [com_wx, com_wy] = _comWorld(comBody, cz, pitch, roll);
-      const supportPts = active.map(i => {
-        const [bx,by,bz] = footBodies[i];
-        const v = rotX(rotY([bx,by,bz], pitch), roll);
-        return [BDY.cx+v[0], BDY.cy+v[1]];
-      });
-      if (!_ptInHull(com_wx, com_wy, supportPts)) continue;
-    }
-
     if (cz < bestCz) { bestCz = cz; bestPitch = pitch; bestRoll = roll; }
   }
 
-  if (bestCz === Infinity && mandatory.length > 0) {
-    const [bx, by, bz] = footBodies[mandatory[0]];
-    return { cz: Math.max(10, -bz), pitch: 0, roll: 0 };
-  }
-  // No foot can reach the floor — body rests on the ground
+  // No valid contact solution — body falls to the ground
   if (bestCz === Infinity) return { cz: BDY.h / 2, pitch: 0, roll: 0 };
   return { cz: bestCz, pitch: bestPitch, roll: bestRoll };
 }
