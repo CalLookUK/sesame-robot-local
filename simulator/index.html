@@ -982,7 +982,7 @@ function setServo(n, v) {
 // Smooth servo transition: lerp from current values to targets over `ms` milliseconds
 function setServos(obj, ms) {
   if (!obj) return;
-  if (!ms || ms <= 0) { Object.entries(obj).forEach(([k,v]) => setServo(k, v)); return; }
+  if (!ms || ms <= 0) { Object.entries(obj).forEach(([k,v]) => setServo(k, v)); applyGravityPose(); drawRobot(); return; }
 
   const from = {};
   const to   = {};
