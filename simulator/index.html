@@ -1030,8 +1030,10 @@ const STAND_STEP = { face:'stand', mode:'once', servos:STAND, delay:500 };
 
 function runStep(seq) {
   if (state.animStepIdx >= seq.length) {
+    const name = state.animName;
+    if (name === 'rest' || name === 'dead') { logLine('✓ holding'); return; }
     stopAnim();
-    if (state.animName !== 'stand' && state.animName !== 'rest' && state.animName !== 'dead') {
+    if (name !== 'stand') {
       setFace('stand', 'once');
       setServos(STAND, STAND_STEP.delay * 0.9 / state.speed);
     }
