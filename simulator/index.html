@@ -801,17 +801,16 @@ function drawRobot() {
   // ── all legs (back behind body, front in front) ──────────────────────────
   [3, 2].forEach(i => _drawLeg(legs[i], LEGS[i].name, true));
 
-  // ── body box wireframe (corners in body frame → world via bodyToWorld) ────
+  // ── body box wireframe (world-space corners, clipped to floor) ────────────
   const {w, d, h} = BDY;
-  const bw = p => iso(...bodyToWorld(...p));
-  const C = [
-    bw([-w/2, -d/2, -h/2]), bw([w/2, -d/2, -h/2]),  // 0,1 bottom-front
-    bw([ w/2,  d/2, -h/2]), bw([-w/2,  d/2, -h/2]),  // 2,3 bottom-back
-    bw([-w/2, -d/2,  h/2]), bw([w/2, -d/2,  h/2]),   // 4,5 top-front
-    bw([ w/2,  d/2,  h/2]), bw([-w/2,  d/2,  h/2]),  // 6,7 top-back
+  const wC = [
+    bodyToWorld(-w/2,-d/2,-h/2), bodyToWorld( w/2,-d/2,-h/2),  // 0,1 bottom-front
+    bodyToWorld( w/2, d/2,-h/2), bodyToWorld(-w/2, d/2,-h/2),  // 2,3 bottom-back
+    bodyToWorld(-w/2,-d/2, h/2), bodyToWorld( w/2,-d/2, h/2),  // 4,5 top-front
+    bodyToWorld( w/2, d/2, h/2), bodyToWorld(-w/2, d/2, h/2),  // 6,7 top-back
   ];
   const EDGES = [[0,1],[1,2],[2,3],[3,0],[4,5],[5,6],[6,7],[7,4],[0,4],[1,5],[2,6],[3,7]];
-  EDGES.forEach(([a,b]) => line(C[a], C[b], '#ff8c42', 1));
+  EDGES.forEach(([a,b]) => worldLine(wC[a], wC[b], '#ff8c42', 1));
 
   // "FRONT" / "BACK" labels
   RCTX.font = 'bold 8px monospace';
@@ -895,19 +894,29 @@ function drawRobot() {
       10, 14);
   }
 
+  // ── OLED preview (128×64, bottom-left) ───────────────────────────────────
+  _drawOledOverlay();
+
   // ── axes legend (small, bottom-right corner) ─────────────────────────────
   _drawAxes();
 }
 
-// Clip world-space segment [A,B] against the floor plane Z=0.
-// Returns [A', B'] with Z>=0, or null if fully underground.
+// Clip world-space segment [A,B] against floor plane Z=-1 (1mm tolerance).
+// Returns [A', B'] with Z>=-1, or null if fully underground.
 function clipFloor(A, B) {
-  const az = A[2], bz = B[2];
+  const ZMIN = -1;
+  const az = A[2] - ZMIN, bz = B[2] - ZMIN;
   if (az < 0 && bz < 0) return null;
   if (az >= 0 && bz >= 0) return [A, B];
   const t = az / (az - bz);
-  const I = [A[0] + t*(B[0]-A[0]), A[1] + t*(B[1]-A[1]), 0];
+  const I = [A[0] + t*(B[0]-A[0]), A[1] + t*(B[1]-A[1]), ZMIN];
   return az < 0 ? [I, B] : [A, I];
+}
+
+// Draw a world-space segment clipped to the floor.
+function worldLine(A, B, col, w) {
+  const seg = clipFloor(A, B);
+  if (seg) line(iso(...seg[0]), iso(...seg[1]), col, w);
 }
 
 function _drawLeg(leg, name, isBack) {
@@ -941,6 +950,32 @@ function _drawLeg(leg, name, isBack) {
   RCTX.fillText(name, footP[0], footP[1] + (leg.foot[2] > 20 ? -10 : 10));
 
   RCTX.globalAlpha = 1;
+}
+
+function _drawOledOverlay() {
+  const frames = FACE_FRAMES[state.face] || [];
+  const f = frames[state.faceFrameIdx];
+  const data = f ? BITMAPS[f] : null;
+  const OW = 128, OH = 64, PAD = 2;
+  const ox = PAD + 1, oy = CH - OH - PAD - 1;
+  // Background + border
+  RCTX.fillStyle = '#000';
+  RCTX.fillRect(ox - PAD, oy - PAD, OW + PAD*2, OH + PAD*2);
+  RCTX.strokeStyle = 'rgba(255,255,255,0.25)';
+  RCTX.lineWidth = 1;
+  RCTX.strokeRect(ox - PAD + 0.5, oy - PAD + 0.5, OW + PAD*2 - 1, OH + PAD*2 - 1);
+  if (!data || data.length < 1024) return;
+  const img = RCTX.createImageData(OW, OH);
+  const d = img.data;
+  for (let y = 0; y < OH; y++) {
+    for (let x = 0; x < OW; x++) {
+      const bit = (data[y * 16 + (x >> 3)] >> (7 - (x & 7))) & 1;
+      const i = (y * OW + x) * 4;
+      const v = bit ? 255 : 0;
+      d[i] = v; d[i+1] = v; d[i+2] = v; d[i+3] = 255;
+    }
+  }
+  RCTX.putImageData(img, ox, oy);
 }
 
 function _drawAxes() {
