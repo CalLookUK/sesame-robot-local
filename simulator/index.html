@@ -156,7 +156,6 @@ h1{
 }
 .ctrl-btn:hover{border-color:var(--orange)}
 .ctrl-btn.primary{background:var(--orange);border-color:var(--orange);color:#000;font-weight:700}
-.ctrl-btn.walk-active{background:#22aa55;border-color:#22aa55;color:#fff;font-weight:700}
 .speed-row{display:flex;align-items:center;gap:5px;font-size:10px;color:var(--text-dim)}
 .speed-row input[type=range]{width:65px}
 
@@ -218,8 +217,6 @@ h1{
       <div class="label">Commands</div>
       <div class="cmd-grid" id="cmd-grid"></div>
       <div class="controls">
-        <button class="ctrl-btn" id="btn-walk">🐾 Walk</button>
-        <button class="ctrl-btn" id="btn-creep">🦎 Creep</button>
         <button class="ctrl-btn primary" id="btn-stop">■ Stop</button>
         <div class="speed-row">
           Speed:
@@ -438,75 +435,6 @@ const ANIMATIONS = {
     { servos:{R4:45,R3:135,L3:0,L4:180},  delay:300 }, { servos:{R4:0,R3:180,L3:45,L4:135}, delay:300 },
     { face:'stand', mode:'once', servos:STAND, delay:0 },
   ],
-  // Trot gait: diagonal pairs alternate between STAND (planted) and REST (lifted).
-  // Group A = FR(R1,R3) + BL(L2,L4) | Group B = FL(L1,L3) + BR(R2,R4)
-  forward: [
-    { face:'walk', mode:'loop', servos:STAND, delay:WD },
-    { servos:{R1:90,R3:90,L2:90,L4:90}, delay:WD },          // A lifts
-    { servos:{R1:135,R3:180,L2:135,L4:180}, delay:WD },      // A plants
-    { servos:{L1:90,L3:90,R2:90,R4:90}, delay:WD },          // B lifts
-    { servos:{L1:45,L3:0,R2:45,R4:0}, delay:WD },            // B plants
-    { servos:{R1:90,R3:90,L2:90,L4:90}, delay:WD },
-    { servos:{R1:135,R3:180,L2:135,L4:180}, delay:WD },
-    { servos:{L1:90,L3:90,R2:90,R4:90}, delay:WD },
-    { servos:{L1:45,L3:0,R2:45,R4:0}, delay:WD },
-    { servos:{R1:90,R3:90,L2:90,L4:90}, delay:WD },
-    { servos:{R1:135,R3:180,L2:135,L4:180}, delay:WD },
-    { servos:{L1:90,L3:90,R2:90,R4:90}, delay:WD },
-    { servos:{L1:45,L3:0,R2:45,R4:0}, delay:WD },
-    { face:'stand', mode:'once', servos:STAND, delay:0 },
-  ],
-  // Reversed phase: B steps first.
-  backward: [
-    { face:'walk', mode:'loop', servos:STAND, delay:WD },
-    { servos:{L1:90,L3:90,R2:90,R4:90}, delay:WD },          // B lifts
-    { servos:{L1:45,L3:0,R2:45,R4:0}, delay:WD },            // B plants
-    { servos:{R1:90,R3:90,L2:90,L4:90}, delay:WD },          // A lifts
-    { servos:{R1:135,R3:180,L2:135,L4:180}, delay:WD },      // A plants
-    { servos:{L1:90,L3:90,R2:90,R4:90}, delay:WD },
-    { servos:{L1:45,L3:0,R2:45,R4:0}, delay:WD },
-    { servos:{R1:90,R3:90,L2:90,L4:90}, delay:WD },
-    { servos:{R1:135,R3:180,L2:135,L4:180}, delay:WD },
-    { servos:{L1:90,L3:90,R2:90,R4:90}, delay:WD },
-    { servos:{L1:45,L3:0,R2:45,R4:0}, delay:WD },
-    { servos:{R1:90,R3:90,L2:90,L4:90}, delay:WD },
-    { servos:{R1:135,R3:180,L2:135,L4:180}, delay:WD },
-    { face:'stand', mode:'once', servos:STAND, delay:0 },
-  ],
-  // Left turn: right side (FR+BR) makes full steps; left side makes half-steps.
-  left: [
-    { face:'walk', mode:'loop', servos:STAND, delay:WD },
-    { servos:{R1:90,R3:90,R2:90,R4:90}, delay:WD },          // right side lifts
-    { servos:{R1:135,R3:180,R2:45,R4:0}, delay:WD },         // right side plants
-    { servos:{L1:67,L3:45,L2:112,L4:135}, delay:WD },        // left side half-lift
-    { servos:{L1:45,L3:0,L2:135,L4:180}, delay:WD },         // left side plants
-    { servos:{R1:90,R3:90,R2:90,R4:90}, delay:WD },
-    { servos:{R1:135,R3:180,R2:45,R4:0}, delay:WD },
-    { servos:{L1:67,L3:45,L2:112,L4:135}, delay:WD },
-    { servos:{L1:45,L3:0,L2:135,L4:180}, delay:WD },
-    { servos:{R1:90,R3:90,R2:90,R4:90}, delay:WD },
-    { servos:{R1:135,R3:180,R2:45,R4:0}, delay:WD },
-    { servos:{L1:67,L3:45,L2:112,L4:135}, delay:WD },
-    { servos:{L1:45,L3:0,L2:135,L4:180}, delay:WD },
-    { face:'stand', mode:'once', servos:STAND, delay:0 },
-  ],
-  // Right turn: left side (FL+BL) makes full steps; right side makes half-steps.
-  right: [
-    { face:'walk', mode:'loop', servos:STAND, delay:WD },
-    { servos:{L1:90,L3:90,L2:90,L4:90}, delay:WD },          // left side lifts
-    { servos:{L1:45,L3:0,L2:135,L4:180}, delay:WD },         // left side plants
-    { servos:{R1:112,R3:135,R2:67,R4:45}, delay:WD },        // right side half-lift
-    { servos:{R1:135,R3:180,R2:45,R4:0}, delay:WD },         // right side plants
-    { servos:{L1:90,L3:90,L2:90,L4:90}, delay:WD },
-    { servos:{L1:45,L3:0,L2:135,L4:180}, delay:WD },
-    { servos:{R1:112,R3:135,R2:67,R4:45}, delay:WD },
-    { servos:{R1:135,R3:180,R2:45,R4:0}, delay:WD },
-    { servos:{L1:90,L3:90,L2:90,L4:90}, delay:WD },
-    { servos:{L1:45,L3:0,L2:135,L4:180}, delay:WD },
-    { servos:{R1:112,R3:135,R2:67,R4:45}, delay:WD },
-    { servos:{R1:135,R3:180,R2:45,R4:0}, delay:WD },
-    { face:'stand', mode:'once', servos:STAND, delay:0 },
-  ],
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -519,7 +447,6 @@ let state = {
   pitch: 0, roll: 0,   // body orientation (radians); updated each frame
   frame: 0,            // draw-frame counter
   legChanged: [0,0,0,0], // frame each leg's servos were last set (FR,FL,BR,BL)
-  gait: { active: false, time: 0, speed: 1.2, legIsStance: [true,true,true,true] },
 };
 // Which servo name belongs to which leg index (FR=0, FL=1, BR=2, BL=3)
 const SERVO_LEG = {R1:0,R3:0, L1:1,L3:1, R2:2,R4:2, L2:3,L4:3};
@@ -898,89 +825,8 @@ function drawRobot() {
 
   [1, 0].forEach(i => _drawLeg(legs[i], LEGS[i].name, false));
 
-  // ── firmware walk overlays ───────────────────────────────────────────────
-  if (FW.active && FW.footW) {
-    // Support polygon from stance feet
-    const fwPts = FW.footW.map((fw, i) => FW.stance[i] ? iso(fw[0], fw[1], 0) : null).filter(Boolean);
-    if (fwPts.length >= 3) {
-      RCTX.beginPath(); RCTX.moveTo(...fwPts[0]);
-      fwPts.slice(1).forEach(p => RCTX.lineTo(...p));
-      RCTX.closePath();
-      RCTX.fillStyle = 'rgba(80,160,255,0.07)'; RCTX.fill();
-      RCTX.strokeStyle = 'rgba(80,160,255,0.3)'; RCTX.lineWidth = 1; RCTX.stroke();
-    }
-    // Contact point markers (filled circle = on ground, open = swing)
-    FW.footW.forEach((fw, i) => {
-      const p = iso(fw[0], fw[1], 0);
-      RCTX.beginPath(); RCTX.arc(p[0], p[1], 4, 0, 6.2832);
-      if (FW.stance[i]) {
-        RCTX.fillStyle = 'rgba(80,200,255,0.8)'; RCTX.fill();
-      } else {
-        RCTX.strokeStyle = 'rgba(80,200,255,0.4)'; RCTX.lineWidth = 1.5; RCTX.stroke();
-      }
-    });
-    // Body path dot
-    const bp = iso(FW.bodyX, FW.bodyY, 0);
-    RCTX.strokeStyle = 'rgba(255,220,0,0.8)'; RCTX.lineWidth = 1.5;
-    RCTX.beginPath(); RCTX.arc(bp[0], bp[1], 4, 0, 6.2832); RCTX.stroke();
-    // HUD
-    const stNames = LEGS.filter((_, i) => FW.stance[i]).map(l => l.name).join('+') || '—';
-    RCTX.font = '9px monospace'; RCTX.textAlign = 'left';
-    RCTX.fillStyle = 'rgba(80,200,255,0.85)';
-    RCTX.fillText(`WALK  frame:${FW.frameIdx}  stance:${stNames}  +${Math.round(FW.bodyY)}mm`, 10, 14);
-  }
-
-  // ── creep gait overlays ──────────────────────────────────────────────────
-  if (CG.active && CG.footW) {
-    // Support polygon (stance feet only)
-    const sPts = CG.footW
-      .map((fw, i) => (i === CG.swingLeg) ? null : iso(fw[0], fw[1], 0))
-      .filter(Boolean);
-    if (sPts.length >= 3) {
-      RCTX.beginPath(); RCTX.moveTo(...sPts[0]);
-      sPts.slice(1).forEach(p => RCTX.lineTo(...p));
-      RCTX.closePath();
-      RCTX.fillStyle   = 'rgba(0,180,80,0.07)';  RCTX.fill();
-      RCTX.strokeStyle = 'rgba(0,180,80,0.28)';  RCTX.lineWidth = 1;  RCTX.stroke();
-    }
-
-    // Stance foot targets (× markers on floor)
-    CG.footW.forEach((fw, i) => {
-      if (i === CG.swingLeg) return;
-      const p = iso(fw[0], fw[1], 0); const s = 4;
-      RCTX.strokeStyle = 'rgba(0,200,100,0.45)'; RCTX.lineWidth = 1;
-      RCTX.beginPath();
-      RCTX.moveTo(p[0]-s,p[1]-s); RCTX.lineTo(p[0]+s,p[1]+s);
-      RCTX.moveTo(p[0]+s,p[1]-s); RCTX.lineTo(p[0]-s,p[1]+s);
-      RCTX.stroke();
-    });
-
-    // Swing-foot landing target (orange circle)
-    if (CG.swingLeg >= 0) {
-      const tp = iso(CG.swingTo[0], CG.swingTo[1], 0);
-      RCTX.strokeStyle = 'rgba(255,140,66,0.7)'; RCTX.lineWidth = 1.5;
-      RCTX.beginPath(); RCTX.arc(tp[0], tp[1], 5, 0, 6.2832); RCTX.stroke();
-    }
-
-    // CoM projection (yellow crosshair)
-    const comP = iso(CG.bodyX, CG.bodyY, 0);
-    RCTX.strokeStyle = 'rgba(255,220,0,0.75)'; RCTX.lineWidth = 1.5;
-    RCTX.beginPath(); RCTX.arc(comP[0], comP[1], 4, 0, 6.2832); RCTX.stroke();
-    RCTX.strokeStyle = 'rgba(255,220,0,0.35)'; RCTX.lineWidth = 1;
-    RCTX.beginPath();
-    RCTX.moveTo(comP[0]-9,comP[1]); RCTX.lineTo(comP[0]+9,comP[1]);
-    RCTX.moveTo(comP[0],comP[1]-9); RCTX.lineTo(comP[0],comP[1]+9);
-    RCTX.stroke();
-
-    // HUD: phase + swing leg name
-    const swName = CG.swingLeg >= 0 ? LEGS[CG.swingLeg].name : '—';
-    RCTX.font = '9px monospace'; RCTX.textAlign = 'left';
-    RCTX.fillStyle = 'rgba(0,200,100,0.85)';
-    RCTX.fillText(`CREEP  ${CG.phase}  swing:${swName}  +${Math.round(CG.bodyY)}mm`, 10, 14);
-  }
-
-  // ── gravity / contact overlay (static poses only) ────────────────────────
-  if (!FW.active && !CG.active) {
+  // ── gravity / contact overlay ────────────────────────────────────────────
+  {
     const stance  = detectStance();
     const fbodies = currentFootBodies();
 
@@ -1218,10 +1064,6 @@ function descStep(s) {
 const COMMANDS = [
   {cmd:'rest',     label:'😴 Rest'},
   {cmd:'stand',    label:'🧍 Stand'},
-  {cmd:'forward',  label:'⬆ Walk'},
-  {cmd:'backward', label:'⬇ Back'},
-  {cmd:'left',     label:'↩ Left'},
-  {cmd:'right',    label:'↪ Right'},
   {cmd:'wave',     label:'👋 Wave'},
   {cmd:'dance',    label:'💃 Dance'},
   {cmd:'swim',     label:'🏊 Swim'},
@@ -1259,88 +1101,6 @@ function logLine(msg) {
   log.scrollTop = log.scrollHeight;
 }
 function clearLog() { document.getElementById('step-log').innerHTML = ''; }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// FIRMWARE WALK PLAYBACK
-// ─────────────────────────────────────────────────────────────────────────────
-// Replays the exact servo angle keyframes from firmware runWalkPose().
-// Body (X,Y) is derived each frame from stance-foot FK constraints — no assumed
-// velocity. This reveals the actual contact points and body motion path.
-//
-// Leg mapping: 0=FR, 1=FL, 2=BR, 3=BL
-//   FR: hip=R1, knee=R3   FL: hip=L1, knee=L3
-//   BR: hip=R2, knee=R4   BL: hip=L2, knee=L4
-//
-// Firmware walk cycle — one pressingCheck call per keyframe (WD=100ms each):
-//   Frame 0  (initial)  : R3=135,L3=45, R2=100,L1=25  (both front knees lift)
-//   Frame 1  (step 1)   : L3=0                          (FL sets down)
-//   Frame 2  (step 2)   : L4=135,L2=90, R4=0, R1=180   (BL lifts, FR hip fwd)
-//   Frame 3  (step 3)   : R2=45, L1=90                  (weight shift)
-//   Frame 4  (step 4)   : R4=45, L4=180                 (BR lifts, BL sets)
-//   Frame 5  (step 5)   : R3=180,L3=45, R2=90, L1=0    (FR sets, FL lifts)
-//   Frame 6  (step 6)   : L2=135,R1=90                  (BL hip back, FR hip back)
-//   → repeat frames 1–6
-
-const FW_FRAMES = [
-  // Frame 0: initial (from STAND, changes: R3=135,L3=45,R2=100,L1=25)
-  {R1:135, R2:100, L1:25,  L2:135, R3:135, R4:0,  L3:45, L4:180},
-  // Frame 1: step 1 — L3=0
-  {R1:135, R2:100, L1:25,  L2:135, R3:135, R4:0,  L3:0,  L4:180},
-  // Frame 2: step 2 — L4=135,L2=90,R4=0,R1=180
-  {R1:180, R2:100, L1:25,  L2:90,  R3:135, R4:0,  L3:0,  L4:135},
-  // Frame 3: step 3 — R2=45,L1=90
-  {R1:180, R2:45,  L1:90,  L2:90,  R3:135, R4:0,  L3:0,  L4:135},
-  // Frame 4: step 4 — R4=45,L4=180
-  {R1:180, R2:45,  L1:90,  L2:90,  R3:135, R4:45, L3:0,  L4:180},
-  // Frame 5: step 5 — R3=180,L3=45,R2=90,L1=0
-  {R1:180, R2:90,  L1:0,   L2:90,  R3:180, R4:45, L3:45, L4:180},
-  // Frame 6: step 6 — L2=135,R1=90
-  {R1:90,  R2:90,  L1:0,   L2:135, R3:180, R4:45, L3:45, L4:180},
-];
-const FW_LOOP_START = 1; // after frame 0, loop frames 1–6
-
-const FW = {
-  active: false,
-  frameIdx: 0,
-  frameT: 0,       // 0→1 progress through current frame
-  bodyX: 0, bodyY: 0,
-  footW: null,     // world foot positions [4]×[x,y,z]
-  stance: [false, false, false, false],
-  raf: null,
-  lastTS: 0,
-};
-
-// Foot position in body frame for given servo map (independent of state.servos)
-function fwFootBody(legIdx, servos) {
-  const leg = LEGS[legIdx];
-  const hipA = leg.hipFn(servos[leg.hs]);
-  const physAngle = leg.kneeFn(servos[leg.ks]);
-  const [mx, my, mz] = leg.mount;
-  const ud = rotZ(leg.dir0, hipA);
-  const sp = Math.sin(physAngle), cp = Math.cos(physAngle);
-  return [
-    mx + ud[0] * (leg.upp + sp * leg.low),
-    my + ud[1] * (leg.upp + sp * leg.low),
-    mz - cp * leg.low,
-  ];
-}
-
-// Leg is in stance when physAngle is near 0 (foot pointing straight down)
-function fwIsStance(legIdx, servos) {
-  return LEGS[legIdx].kneeFn(servos[LEGS[legIdx].ks]) < 0.18; // < ~10°
-}
-
-function fwLerp(a, b, t) {
-  const o = {};
-  for (const k of Object.keys(a)) o[k] = a[k] + (b[k] - a[k]) * t;
-  return o;
-}
-
-function fwNextIdx(idx) {
-  if (idx === 0) return FW_LOOP_START;
-  const span = FW_FRAMES.length - FW_LOOP_START;
-  return FW_LOOP_START + (idx - FW_LOOP_START + 1) % span;
-}
 
 // Detect stance for current state.servos (knee physAngle < threshold = on ground)
 function detectStance() {
@@ -1391,7 +1151,6 @@ function computeCoM() {
 // Apply gravity physics to a static pose: solves body Z/pitch/roll so stance
 // feet sit on the floor (Z=0). Call after updating state.servos for any pose.
 function applyGravityPose() {
-  if (FW.active || CG.active) return; // gaits manage their own body pose
   const stance = detectStance();
   const footBodies = currentFootBodies();
   const comBody = computeCoM();
@@ -1399,16 +1158,6 @@ function applyGravityPose() {
   BDY.cz      = cz;
   state.pitch = pitch;
   state.roll  = roll;
-}
-
-function fwApplyServos(servos) {
-  for (const [k, v] of Object.entries(servos)) {
-    state.servos[k] = v;
-    const sl = document.getElementById('sv-' + k);
-    const vl = document.getElementById('sv-val-' + k);
-    if (sl) sl.value = v;
-    if (vl) vl.textContent = Math.round(v) + '°';
-  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1544,322 +1293,10 @@ function solveBodyGravity(footBodies, stanceFlags, comBody) {
   return { cz: bestCz, pitch: bestPitch, roll: bestRoll };
 }
 
-function fwTick(ts) {
-  if (!FW.active) return;
-  const dt = Math.min((ts - FW.lastTS) / 1000, 0.05);
-  FW.lastTS = ts;
-
-  FW.frameT += dt / (WD / 1000);
-
-  // Advance keyframes (may skip >1 if dt is large)
-  while (FW.frameT >= 1) {
-    FW.frameT -= 1;
-    FW.frameIdx = fwNextIdx(FW.frameIdx);
-    const newS = FW_FRAMES[FW.frameIdx];
-    // Detect stance transitions; plant newly-grounded feet
-    for (let i = 0; i < 4; i++) {
-      const now = fwIsStance(i, newS);
-      if (now && !FW.stance[i]) {
-        const fb = fwFootBody(i, newS);
-        FW.footW[i] = [FW.bodyX + fb[0], FW.bodyY + fb[1], 0];
-      }
-      FW.stance[i] = now;
-    }
-  }
-
-  // Interpolated servo state between current and next keyframe
-  const cur = FW_FRAMES[FW.frameIdx];
-  const nxt = FW_FRAMES[fwNextIdx(FW.frameIdx)];
-  const servos = fwLerp(cur, nxt, FW.frameT);
-
-  // Body XY from stance feet (FK inverse, flat-body approximation)
-  let sx = 0, sy = 0, sc = 0;
-  for (let i = 0; i < 4; i++) {
-    if (FW.stance[i]) {
-      const fb = fwFootBody(i, servos);
-      sx += FW.footW[i][0] - fb[0];
-      sy += FW.footW[i][1] - fb[1];
-      sc++;
-    }
-  }
-  if (sc > 0) { FW.bodyX = sx / sc; FW.bodyY = sy / sc; }
-
-  fwApplyServos(servos);
-  BDY.cx = FW.bodyX; BDY.cy = FW.bodyY;
-  cam.x  = FW.bodyX; cam.y  = FW.bodyY;
-
-  drawRobot();
-  FW.raf = requestAnimationFrame(fwTick);
-}
-
-function startGait() {
-  if (CG.active) stopCreep();
-  if (state.animTimer) { clearTimeout(state.animTimer); state.animTimer = null; state.animName = null; }
-
-  FW.bodyX = 0; FW.bodyY = 0;
-  BDY.cx = 0; BDY.cy = 0;
-  cam.x = 0; cam.y = 0;
-
-  // Start from stand; record world foot positions from FK
-  Object.entries(STAND).forEach(([k, v]) => { state.servos[k] = v; });
-  FW.footW = LEGS.map((_, i) => {
-    const fb = fwFootBody(i, STAND);
-    return [fb[0], fb[1], 0]; // body at origin → world = body frame
-  });
-  FW.stance  = [true, true, true, true];
-  FW.frameIdx = 0;
-  FW.frameT   = 0;
-  FW.active   = true;
-  state.gait.active = true; // keep existing stop logic working
-
-  setFace('walk', 'loop');
-  const btn = document.getElementById('btn-walk');
-  if (btn) { btn.textContent = '⏹ Stop Walk'; btn.classList.add('walk-active'); }
-  FW.lastTS = performance.now();
-  FW.raf = requestAnimationFrame(fwTick);
-  logLine('🐾 firmware walk started');
-}
-
-function stopGait() {
-  FW.active = false;
-  state.gait.active = false;
-  if (FW.raf) { cancelAnimationFrame(FW.raf); FW.raf = null; }
-  const btn = document.getElementById('btn-walk');
-  if (btn) { btn.textContent = '🐾 Walk'; btn.classList.remove('walk-active'); }
-  setFace('stand', 'once');
-  Object.entries(STAND).forEach(([k, v]) => {
-    state.servos[k] = v;
-    const sl = document.getElementById('sv-'+k);
-    const vl = document.getElementById('sv-val-'+k);
-    if (sl) sl.value = v;
-    if (vl) vl.textContent = Math.round(v) + '°';
-  });
-  BDY.cx = 0; BDY.cy = 0; cam.x = 0; cam.y = 0;
-  BDY.cz = 66; state.pitch = 0; state.roll = 0;
-  drawRobot();
-  logLine('⏹ walk stopped');
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// CREEP GAIT  (world-frame IK, one leg swings at a time, CoM shifting)
-// ─────────────────────────────────────────────────────────────────────────────
-//
-// World frame: floor Z=0, body walks in +Y direction.
-// The body centre (BDY.cx, BDY.cy) moves in world space; camera tracks it so
-// the view stays centred. Feet are given fixed world-frame targets during stance;
-// IK converts those targets to servo angles each frame.
-//
-// Gait cycle (4-beat creep, diagonally ordered for smooth CoM transfer):
-//   leg order: FR(0) → BL(3) → FL(1) → BR(2) → repeat
-//   phases per step: stance (body moves fwd) → com_shift (lateral body shift)
-//                    → swing (parabolic foot trajectory) → back to stance
-//
-// CoM shift: before swinging a right leg shift body −X (left),
-//            before swinging a left leg shift body +X (right).
-// ─────────────────────────────────────────────────────────────────────────────
-const CG_VELOCITY  = 20;    // mm/s forward body speed
-const CG_STEP      = 36;    // mm stride (tuned so relY_after_land = 3×cadence − threshold)
-const CG_HEIGHT    = 20;    // mm peak foot lift (parabolic arc)
-const CG_SWING_DUR = 0.40;  // seconds per swing phase
-const CG_COM_DUR   = 0.20;  // seconds per CoM-shift phase
-const CG_COM_AMT   = 18;    // mm lateral CoM shift magnitude
-const CG_ORDER     = [0, 3, 1, 2]; // FR, BL, FL, BR
-const CG_IS_RIGHT  = new Set([0, 2]); // FR, BR → need left-shift before swing
-
-const CG = {
-  active: false,
-  bodyX: 0, bodyY: 0,        // body world position
-  bodyXStart: 0,             // bodyX at start of current com_shift
-  bodyXTarget: 0,            // bodyX target for com_shift
-  footW: null,               // [4]×[wx,wy,wz] world-frame foot positions
-  phase: 'stance',           // 'stance' | 'com_shift' | 'swing'
-  orderIdx: 0,               // index into CG_ORDER
-  swingLeg: -1,              // currently swinging leg index (or -1)
-  swingT: 0,                 // swing phase progress 0→1
-  comT:   0,                 // com_shift phase progress 0→1
-  swingFrom: [0, 0],         // world XY where swing started
-  swingTo:   [0, 0],         // world XY where foot will land
-  lastTS: 0,
-  raf: null,
-};
-
-// World-frame foot positions at gait start — each foot placed directly outward
-// from its hip mount (hip servo = 90°, knee fully down), giving relY = 0 for all
-// legs so the first steps phase in naturally in creep order rather than all
-// triggering simultaneously.
-function cgStandFeet() {
-  const cadence   = CG_VELOCITY * (CG_COM_DUR + CG_SWING_DUR); // body advance per step
-  const threshold = CG_STEP * 0.45;
-  return LEGS.map((leg, i) => {
-    const [mx, my] = leg.mount;
-    const orderPos = CG_ORDER.indexOf(i);
-    const footY    = orderPos * cadence + my - threshold;
-    return [mx + leg.dir0[0] * leg.upp, footY, 0];
-  });
-}
-
-// Solve IK for all 4 legs from current world state and write servo angles
-function cgSolveAll() {
-  for (let i = 0; i < 4; i++) {
-    const leg = LEGS[i];
-    const [mx, my, mz] = leg.mount;
-    // Hip mount in world frame (body pitch=roll=0)
-    const hipW = [CG.bodyX + mx, CG.bodyY + my, BDY.cz + mz];
-
-    // Foot world target (swing uses interpolated arc, stance uses fixed footW)
-    let fw;
-    if (i === CG.swingLeg) {
-      const t = CG.swingT;
-      // Parabolic (sine bell) lift: Z = H·sin(π·t)
-      fw = [
-        CG.swingFrom[0] + (CG.swingTo[0] - CG.swingFrom[0]) * t,
-        CG.swingFrom[1] + (CG.swingTo[1] - CG.swingFrom[1]) * t,
-        CG_HEIGHT * Math.sin(Math.PI * t),
-      ];
-    } else {
-      fw = CG.footW[i];
-    }
-
-    // Foot relative to hip mount in body frame
-    applyIKLeg(leg, fw[0]-hipW[0], fw[1]-hipW[1], fw[2]-hipW[2]);
-  }
-}
-
-function cgTick(ts) {
-  if (!CG.active) return;
-  const dt = Math.min((ts - CG.lastTS) / 1000, 0.04);
-  CG.lastTS = ts;
-
-  if (CG.phase === 'stance') {
-    // Body advances forward; feet stay fixed in world → effective backward motion
-    CG.bodyY += CG_VELOCITY * dt;
-
-    // Check whether the next-in-order leg needs to swing
-    const next = CG_ORDER[CG.orderIdx];
-    const leg  = LEGS[next];
-    const hipWorldY = CG.bodyY + leg.mount[1];
-    const relY = CG.footW[next][1] - hipWorldY; // negative = foot behind hip
-
-    if (relY < -CG_STEP * 0.45) {
-      // Trigger CoM shift before swinging
-      CG.bodyXTarget = CG_IS_RIGHT.has(next) ? -CG_COM_AMT : CG_COM_AMT;
-      CG.bodyXStart  = CG.bodyX;
-      CG.comT  = 0;
-      CG.phase = 'com_shift';
-    }
-
-  } else if (CG.phase === 'com_shift') {
-    CG.bodyY += CG_VELOCITY * dt;
-    CG.comT += dt / CG_COM_DUR;
-    if (CG.comT >= 1) {
-      CG.comT    = 1;
-      CG.bodyX   = CG.bodyXTarget;
-
-      // Begin swing
-      const si  = CG_ORDER[CG.orderIdx];
-      const leg = LEGS[si];
-      CG.swingLeg  = si;
-      CG.swingT    = 0;
-      CG.swingFrom = [CG.footW[si][0], CG.footW[si][1]];
-      // Land half a stride ahead of hip, aligned with body X
-      CG.swingTo = [
-        CG.bodyX + leg.mount[0] + leg.dir0[0] * leg.upp * 0.5,
-        CG.bodyY + leg.mount[1] + CG_STEP * 0.5,
-      ];
-      CG.phase = 'swing';
-    } else {
-      // Ease-in-out lateral shift
-      const e = CG.comT < 0.5 ? 2*CG.comT*CG.comT : -1+(4-2*CG.comT)*CG.comT;
-      CG.bodyX = CG.bodyXStart + (CG.bodyXTarget - CG.bodyXStart) * e;
-    }
-
-  } else { // 'swing'
-    CG.bodyY += CG_VELOCITY * dt;
-    CG.swingT += dt / CG_SWING_DUR;
-    if (CG.swingT >= 1) {
-      CG.swingT = 1;
-      // Land foot at world target
-      CG.footW[CG.swingLeg] = [CG.swingTo[0], CG.swingTo[1], 0];
-      CG.swingLeg  = -1;
-      CG.orderIdx  = (CG.orderIdx + 1) % 4;
-      CG.phase     = 'stance';
-    }
-  }
-
-  // Sync BDY and camera so render stays body-centred
-  BDY.cx = CG.bodyX;
-  BDY.cy = CG.bodyY;
-  cam.x  = CG.bodyX;
-  cam.y  = CG.bodyY;
-
-  cgSolveAll();
-  drawRobot();
-  CG.raf = requestAnimationFrame(cgTick);
-}
-
-function startCreep() {
-  stopAnim();
-  if (state.gait.active) stopGait();
-
-  // Reset world position and camera
-  CG.bodyX = 0; CG.bodyY = 0;
-  BDY.cx = 0; BDY.cy = 0;
-  cam.x  = 0; cam.y  = 0;
-
-  CG.footW    = cgStandFeet();
-  CG.phase    = 'stance';
-  CG.orderIdx = 0;
-  CG.swingLeg = -1;
-  CG.swingT   = 0;
-  CG.comT     = 0;
-  CG.active   = true;
-
-  setFace('walk', 'loop');
-  const btn = document.getElementById('btn-creep');
-  if (btn) { btn.textContent = '⏹ Stop Creep'; btn.classList.add('walk-active'); }
-  logLine('🦎 creep gait started (world-frame IK)');
-  CG.lastTS = performance.now();
-  CG.raf = requestAnimationFrame(cgTick);
-}
-
-function stopCreep() {
-  CG.active = false;
-  if (CG.raf) { cancelAnimationFrame(CG.raf); CG.raf = null; }
-  CG.swingLeg = -1;
-
-  // Return camera and body to origin
-  BDY.cx = 0; BDY.cy = 0;
-  cam.x  = 0; cam.y  = 0;
-
-  const btn = document.getElementById('btn-creep');
-  if (btn) { btn.textContent = '🦎 Creep'; btn.classList.remove('walk-active'); }
-  setFace('stand', 'once');
-  Object.entries(STAND).forEach(([k, v]) => {
-    state.servos[k] = v;
-    const sl = document.getElementById('sv-' + k);
-    const vl = document.getElementById('sv-val-' + k);
-    if (sl) sl.value = v;
-    if (vl) vl.textContent = Math.round(v) + '°';
-  });
-  drawRobot();
-  logLine('⏹ creep stopped');
-}
-
 // ─────────────────────────────────────────────────────────────────────────────
 // CONTROLS
 // ─────────────────────────────────────────────────────────────────────────────
-document.getElementById('btn-walk').addEventListener('click', () => {
-  if (CG.active) stopCreep();
-  if (state.gait.active) stopGait(); else startGait();
-});
-
-document.getElementById('btn-creep').addEventListener('click', () => {
-  if (CG.active) stopCreep(); else startCreep();
-});
-
 document.getElementById('btn-stop').addEventListener('click', () => {
-  if (CG.active) stopCreep();
-  if (state.gait.active) stopGait();
   stopAnim();
   logLine('■ stopped');
 });
@@ -1868,16 +1305,7 @@ const speedSlider = document.getElementById('speed-slider');
 const speedVal    = document.getElementById('speed-val');
 speedSlider.addEventListener('input', () => {
   state.speed = speedSlider.value / 100;
-  state.gait.speed = 1.67 * state.speed;  // scale trot frequency with speed slider — matches firmware ~1.67 Hz
   speedVal.textContent = state.speed.toFixed(2).replace(/\.?0+$/,'') + '×';
-});
-
-// Keyboard: W toggles trot gait
-document.addEventListener('keydown', e => {
-  if (e.target.tagName === 'INPUT') return;
-  if (e.key === 'w' || e.key === 'W') {
-    if (state.gait.active) stopGait(); else startGait();
-  }
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
