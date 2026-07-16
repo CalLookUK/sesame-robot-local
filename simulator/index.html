@@ -980,30 +980,37 @@ function setServo(n, v) {
 }
 
 // Smooth servo transition: lerp from current values to targets over `ms` milliseconds
+// Returns the actual transition duration used (ms), so callers can schedule
+// the next step accurately even when the input ms was 0.
 function setServos(obj, ms) {
-  if (!obj) return;
-  if (!ms || ms <= 0) { Object.entries(obj).forEach(([k,v]) => setServo(k, v)); applyGravityPose(); drawRobot(); return; }
+  if (!obj) return 0;
+  if (!ms || ms <= 0) {
+    const maxDelta = Object.entries(obj).reduce((m, [k, v]) =>
+      Math.max(m, Math.abs((state.servos[k] ?? 90) - v)), 0);
+    if (maxDelta < 1) { applyGravityPose(); drawRobot(); return 0; }
+    ms = Math.max(300, maxDelta * 6); // ~6 ms per degree, min 300 ms
+  }
 
-  const from = {};
-  const to   = {};
-  Object.entries(obj).forEach(([k,v]) => { from[k] = state.servos[k]; to[k] = v; });
+  const from = {}, to = {};
+  Object.entries(obj).forEach(([k, v]) => { from[k] = state.servos[k]; to[k] = v; });
 
   const start = performance.now();
   function tick(now) {
     const t = Math.min((now - start) / ms, 1);
-    const ease = t < 0.5 ? 2*t*t : -1+(4-2*t)*t; // ease-in-out quad
-    Object.entries(to).forEach(([k,v]) => {
+    const ease = t < 0.5 ? 2*t*t : -1+(4-2*t)*t;
+    Object.entries(to).forEach(([k, v]) => {
       const cur = from[k] + (v - from[k]) * ease;
       state.servos[k] = cur;
       const sl = document.getElementById('sv-'+k), vl = document.getElementById('sv-val-'+k);
       if (sl) sl.value = cur;
       if (vl) vl.textContent = Math.round(cur) + '°';
     });
-    applyGravityPose(); // recompute body tilt from current (interpolating) servo angles
+    applyGravityPose();
     drawRobot();
     if (t < 1) requestAnimationFrame(tick);
   }
   requestAnimationFrame(tick);
+  return ms;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1026,7 +1033,6 @@ function playAnim(name) {
   runStep(seq);
 }
 
-const STAND_STEP = { face:'stand', mode:'once', servos:STAND, delay:500 };
 
 function runStep(seq) {
   if (state.animStepIdx >= seq.length) {
@@ -1035,7 +1041,7 @@ function runStep(seq) {
     stopAnim();
     if (name !== 'stand') {
       setFace('stand', 'once');
-      setServos(STAND, STAND_STEP.delay * 0.9 / state.speed);
+      setServos(STAND, 0); // duration auto-computed from servo delta
     }
     logLine('✓ done');
     return;
@@ -1043,10 +1049,12 @@ function runStep(seq) {
   const step = seq[state.animStepIdx++];
   logLine(`${state.animStepIdx}. ${descStep(step)}`);
   if (step.face) setFace(step.face, step.mode || 'loop');
-  const transMs = (step.delay || 0) / state.speed;
-  if (step.servos) setServos(step.servos, transMs * 0.9);
-  const ms = (step.delay || 0) / state.speed;
-  if (ms > 0) state.animTimer = setTimeout(() => { runStep(seq); }, ms);
+  const stepMs  = (step.delay || 0) / state.speed;
+  const transMs = step.servos ? setServos(step.servos, stepMs * 0.9) : 0;
+  // Wait at least as long as the servo transition so motion finishes before
+  // the next step starts, even for delay:0 steps
+  const waitMs = Math.max(stepMs, transMs);
+  if (waitMs > 0) state.animTimer = setTimeout(() => { runStep(seq); }, waitMs);
   else runStep(seq);
 }
 
