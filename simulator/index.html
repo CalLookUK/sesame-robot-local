@@ -1224,10 +1224,12 @@ function logLine(msg) {
 }
 function clearLog() { document.getElementById('step-log').innerHTML = ''; }
 
-// Detect stance: foot world-Z ≤ threshold (no legChanged exclusion — the velocity
-// integrator handles contact resolution regardless of recent motion).
+// Detect stance: foot world-Z ≤ threshold, accounting for current body pitch/roll.
 function detectStance(footBodies) {
-  return footBodies.map(([bx, by, bz]) => BDY.cz + bz <= 4);
+  return footBodies.map(([bx, by, bz]) => {
+    const v = rotX(rotY([bx, by, bz], state.pitch), state.roll);
+    return BDY.cz + v[2] <= 4;
+  });
 }
 
 // Compute foot body-frame positions from current state.servos (flat-body approx)
@@ -1272,11 +1274,12 @@ function computeCoM() {
 }
 
 // Solve pitch/roll from feet that are at or near the floor (worldZ ≤ 4mm).
+// Uses body-frame foot positions (FK output) — _solveContact handles the math.
 function _solvePitchRoll(footBodies, stance) {
   const active = [0,1,2,3].filter(i => stance[i]);
-  if (active.length < 2) return { pitch: 0, roll: 0 };
+  if (active.length < 2) return { pitch: state.pitch, roll: state.roll };
   const [, pitch, roll] = _solveContact(footBodies, active);
-  if (Math.abs(pitch) > 0.6 || Math.abs(roll) > 0.6) return { pitch: 0, roll: 0 };
+  if (Math.abs(pitch) > 0.6 || Math.abs(roll) > 0.6) return { pitch: state.pitch, roll: state.roll };
   return { pitch, roll };
 }
 
@@ -1296,10 +1299,12 @@ function applyGravityPose() {
   // Hard floor: body belly can't go underground
   if (BDY.cz < BDY.h / 2) { BDY.cz = BDY.h / 2; if (bodyVelZ < 0) bodyVelZ = 0; }
 
-  // Hard contact: find deepest foot penetration and push body up by that amount
+  // Hard contact: find deepest foot penetration and push body up by that amount.
+  // Apply current pitch/roll so contact world-Z matches what the renderer draws.
   let maxPenetration = 0;
   for (const [bx, by, bz] of footBodies) {
-    const worldZ = BDY.cz + bz;
+    const v = rotX(rotY([bx, by, bz], state.pitch), state.roll);
+    const worldZ = BDY.cz + v[2];
     if (worldZ < 0) maxPenetration = Math.max(maxPenetration, -worldZ);
   }
   if (maxPenetration > 0) {
