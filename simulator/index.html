@@ -804,7 +804,7 @@ function drawRobot() {
   const legs = LEGS.map(computeLeg);
 
   // ── floor ───────────────────────────────────────────────────────────────
-  const GS = 22, GR = 110; // grid spacing, grid radius (world mm)
+  const GS = 22, GR = 200; // grid spacing, grid radius (world mm)
 
   // Snap grid origin to camera so the grid tiles seamlessly as the body walks
   const gx0 = Math.floor((cam.x - GR) / GS) * GS;
@@ -1274,6 +1274,45 @@ function computeCoM() {
 }
 
 // Apply gravity physics: velocity integrator for BDY.cz (no smoothing lag / no
+// Compute the minimum BDY.cz required so that no solid geometry (body corners,
+// knee joints, lower-leg midpoints, foot tips) penetrates the floor plane.
+// Uses current pitch/roll so the geometry matches what the renderer draws.
+function _czFromGeometry(pitch, roll) {
+  const {w, d, h} = BDY;
+  let czMin = h / 2; // belly floor baseline
+
+  // Bottom 4 body corners (top corners can't go underground)
+  for (const [bx, by, bz] of [[-w/2,-d/2,-h/2],[w/2,-d/2,-h/2],[w/2,d/2,-h/2],[-w/2,d/2,-h/2]]) {
+    const v = rotX(rotY([bx, by, bz], pitch), roll);
+    czMin = Math.max(czMin, -v[2]);
+  }
+
+  // Per-leg: knee, lower-leg midpoint, and foot tip
+  for (let i = 0; i < 4; i++) {
+    const leg = LEGS[i];
+    const hipA  = leg.hipFn(state.servos[leg.hs]);
+    const physA = leg.kneeFn(state.servos[leg.ks]);
+    const [mx, my, mz] = leg.mount;
+    const ud = rotZ(leg.dir0, hipA);
+    const sp = Math.sin(physA), cp = Math.cos(physA);
+
+    const kbx = mx + ud[0]*leg.upp, kby = my + ud[1]*leg.upp; // knee (body-frame z = mz)
+    const fbx = kbx + ud[0]*sp*leg.low, fby = kby + ud[1]*sp*leg.low, fbz = mz - cp*leg.low; // foot
+
+    for (const [bx, by, bz] of [
+      [kbx, kby, mz],                                          // knee
+      [(kbx+fbx)/2, (kby+fby)/2, (mz+fbz)/2],                 // lower-leg midpoint
+      [fbx, fby, fbz],                                         // foot tip
+    ]) {
+      const v = rotX(rotY([bx, by, bz], pitch), roll);
+      czMin = Math.max(czMin, -v[2]);
+    }
+  }
+
+  return czMin;
+}
+
+// Apply gravity physics: velocity integrator for BDY.cz (no smoothing lag / no
 // penetration) combined with solveBodyGravity for pitch/roll (gravity-aware tipping).
 function applyGravityPose() {
   const DT   = 1 / 60;
@@ -1289,17 +1328,18 @@ function applyGravityPose() {
   // e.g. with only back feet as stance, the body pitches forward naturally.
   const { cz: czContact, pitch, roll } = solveBodyGravity(footBodies, stance, comBody);
 
+  // Geometric floor: ensures body box, knees, lower-leg midpoints and feet never
+  // penetrate. This is the hard floor that accounts for all solid geometry.
+  const czGeom = _czFromGeometry(pitch, roll);
+  const czFloor = Math.max(czContact, czGeom);
+
   // Gravity integration
   bodyVelZ -= GRAV * DT;
   BDY.cz   += bodyVelZ * DT;
 
-  // Belly floor: body can't sink through ground on its underside
-  if (BDY.cz < BDY.h / 2) { BDY.cz = BDY.h / 2; if (bodyVelZ < 0) bodyVelZ = 0; }
-
-  // Contact floor: czContact is the lowest valid BDY.cz given current contacts.
-  // The velocity integrator can't go below this (feet would penetrate).
-  if (BDY.cz < czContact) {
-    BDY.cz = czContact;
+  // Apply the combined floor constraint
+  if (BDY.cz < czFloor) {
+    BDY.cz = czFloor;
     if (bodyVelZ < 0) bodyVelZ *= -DAMP;
   }
 
