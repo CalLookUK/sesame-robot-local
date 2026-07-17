@@ -472,6 +472,7 @@ let state = {
   frame: 0,            // draw-frame counter
   legChanged: [0,0,0,0], // frame each leg's servos were last set (FR,FL,BR,BL)
 };
+let bodyVelZ = 0; // mm/s — vertical velocity of body centre under gravity
 // Which servo name belongs to which leg index (FR=0, FL=1, BR=2, BL=3)
 const SERVO_LEG = {R1:0,R3:0, L1:1,L3:1, R2:2,R4:2, L2:3,L4:3};
 const STANCE_FRAMES = 6; // frames of servo silence before a leg is considered grounded
@@ -1223,14 +1224,10 @@ function logLine(msg) {
 }
 function clearLog() { document.getElementById('step-log').innerHTML = ''; }
 
-// Detect stance: leg must not have moved recently AND foot must be near the floor.
-// Uses world-Z estimate (BDY.cz + bz ≤ 20mm) so horizontal legs aren't confused
-// with grounded ones, and moving legs are excluded while in motion.
+// Detect stance: foot world-Z ≤ threshold (no legChanged exclusion — the velocity
+// integrator handles contact resolution regardless of recent motion).
 function detectStance(footBodies) {
-  return LEGS.map((leg, i) => {
-    if (state.frame - state.legChanged[i] < STANCE_FRAMES) return false;
-    return BDY.cz + footBodies[i][2] <= 20;
-  });
+  return footBodies.map(([bx, by, bz]) => BDY.cz + bz <= 4);
 }
 
 // Compute foot body-frame positions from current state.servos (flat-body approx)
@@ -1274,20 +1271,48 @@ function computeCoM() {
   return [wx/MASS_TOTAL, wy/MASS_TOTAL, wz/MASS_TOTAL];
 }
 
-// Apply gravity physics: solves body Z/pitch/roll so stance feet sit on the floor.
-// Uses smoothed transitions to avoid jarring jumps during animation.
-function applyGravityPose() {
-  const footBodies = currentFootBodies();
-  const stance = detectStance(footBodies);
-  const comBody = computeCoM();
-  const { cz, pitch, roll } = solveBodyGravity(footBodies, stance, comBody);
+// Solve pitch/roll from feet that are at or near the floor (worldZ ≤ 4mm).
+function _solvePitchRoll(footBodies, stance) {
+  const active = [0,1,2,3].filter(i => stance[i]);
+  if (active.length < 2) return { pitch: 0, roll: 0 };
+  const [, pitch, roll] = _solveContact(footBodies, active);
+  if (Math.abs(pitch) > 0.6 || Math.abs(roll) > 0.6) return { pitch: 0, roll: 0 };
+  return { pitch, roll };
+}
 
-  // Smooth body height transitions (prevents snapping during fast animations).
-  // Rise faster than fall — gravity is slow, support is instant.
-  const alpha = cz > BDY.cz ? 0.35 : 0.20;
-  BDY.cz      = BDY.cz      * (1 - alpha) + cz    * alpha;
-  state.pitch = state.pitch * (1 - alpha) + pitch * alpha;
-  state.roll  = state.roll  * (1 - alpha) + roll  * alpha;
+// Apply gravity physics using velocity integration + hard floor contact resolution.
+// Euler integration: body falls under gravity, contacts push it up, no smoothing lag.
+function applyGravityPose() {
+  const DT   = 1 / 60;          // seconds per frame
+  const GRAV = 9800;             // mm/s² (earth gravity)
+  const DAMP = 0.30;             // vertical damping at contact (absorbs bounce)
+
+  const footBodies = currentFootBodies();
+
+  // Integrate gravity
+  bodyVelZ -= GRAV * DT;
+  BDY.cz   += bodyVelZ * DT;
+
+  // Hard floor: body belly can't go underground
+  if (BDY.cz < BDY.h / 2) { BDY.cz = BDY.h / 2; if (bodyVelZ < 0) bodyVelZ = 0; }
+
+  // Hard contact: find deepest foot penetration and push body up by that amount
+  let maxPenetration = 0;
+  for (const [bx, by, bz] of footBodies) {
+    const worldZ = BDY.cz + bz;
+    if (worldZ < 0) maxPenetration = Math.max(maxPenetration, -worldZ);
+  }
+  if (maxPenetration > 0) {
+    BDY.cz += maxPenetration;
+    if (bodyVelZ < 0) bodyVelZ *= -DAMP; // slight bounce damping
+  }
+
+  // Solve pitch/roll from grounded feet, with gentle smoothing to avoid jitter
+  const stance = detectStance(footBodies);
+  const { pitch, roll } = _solvePitchRoll(footBodies, stance);
+  const a = 0.25;
+  state.pitch = state.pitch * (1 - a) + pitch * a;
+  state.roll  = state.roll  * (1 - a) + roll  * a;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1442,10 +1467,11 @@ Object.entries(STAND).forEach(([k, v]) => {
   if (sl) sl.value = v;
   if (vl) vl.textContent = Math.round(v) + '°';
 });
-// Solve initial body height directly (no smoothing) so STAND renders correctly
-{ const fb = currentFootBodies(); const st = detectStance(fb);
-  const { cz, pitch, roll } = solveBodyGravity(fb, st, computeCoM());
-  BDY.cz = cz; state.pitch = pitch; state.roll = roll; }
+// Solve initial body height and reset velocity so STAND renders correctly from frame 0
+{ const fb = currentFootBodies(); const st = fb.map(([,, bz]) => true);
+  const [cz, pitch, roll] = _solveContact(fb, [0,1,2,3]);
+  BDY.cz = Math.max(cz, BDY.h/2); state.pitch = pitch; state.roll = roll;
+  bodyVelZ = 0; }
 setFace('idle', 'boomerang');
 drawRobot();
 </script>
