@@ -1363,8 +1363,11 @@ function applyGravityPose() {
     roll  += Math.max(-CAP, Math.min(CAP, cBy / h * 0.5 * tipFrac));
   }
 
-  // Geometric floor using CURRENT pitch/roll so it matches what the renderer draws.
-  const czGeom  = _czFromGeometry(state.pitch, state.roll);
+  // Geometric floor: use pitchSolved/rollSolved (≈0 for symmetric contacts) rather
+  // than state.pitch/roll. Using accumulated state values amplifies error — a foot
+  // at large bx causes czGeom to rise above czContact, lifting the other stance foot
+  // off the floor, which triggers the tipping heuristic and causes runaway tipping.
+  const czGeom  = _czFromGeometry(pitchSolved, rollSolved);
   const czFloor = Math.max(czContact, czGeom);
 
   // Gravity integration
