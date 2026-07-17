@@ -472,7 +472,8 @@ let state = {
   frame: 0,            // draw-frame counter
   legChanged: [0,0,0,0], // frame each leg's servos were last set (FR,FL,BR,BL)
 };
-let bodyVelZ = 0; // mm/s — vertical velocity of body centre under gravity
+let bodyVelZ   = 0; // mm/s — vertical velocity of body centre under gravity
+let prevCzFloor = 0; // previous frame's effective floor height (for hop detection)
 // Which servo name belongs to which leg index (FR=0, FL=1, BR=2, BL=3)
 const SERVO_LEG = {R1:0,R3:0, L1:1,L3:1, R2:2,R4:2, L2:3,L4:3};
 const STANCE_FRAMES = 6; // frames of servo silence before a leg is considered grounded
@@ -822,29 +823,42 @@ function drawRobot() {
   RCTX.globalAlpha = 1;
   poly(fc, null, '#1e321e', 1.2);
 
-  // ── floor contact ellipses ───────────────────────────────────────────────
+  // ── floor contact ellipses (foot tips) ──────────────────────────────────
   legs.forEach(leg => {
     const [fx, fy, fz] = leg.foot;
     if (leg.grounded) {
-      // Outer glow ring
       RCTX.globalAlpha = 0.15;
       isoFloorCircle(fx, fy, 14, '#ff8c42');
-      // Contact ring
       RCTX.globalAlpha = 0.7;
       isoFloorCircle(fx, fy, 8, null, '#ff8c42', 1);
       RCTX.globalAlpha = 1;
-      // Vertical drop line from foot to floor
       const fp = iso(fx, fy, Math.max(fz, 0));
       const sp = iso(fx, fy, 0);
       if (fz > 1) line(fp, sp, 'rgba(255,140,66,0.3)', 1);
     } else {
-      // Faint shadow blob shrinks as foot rises
       const alpha = Math.max(0, 0.2 - fz * 0.002);
       RCTX.globalAlpha = alpha;
       isoFloorCircle(fx, fy, 6, '#8888aa');
       RCTX.globalAlpha = 1;
     }
   });
+
+  // ── geometric contact markers (body corners + all leg segment points) ────
+  // Any sample point within 3mm of the floor is highlighted as a contact.
+  {
+    const geoPts = _geometryPoints();
+    for (const [bx, by, bz] of geoPts) {
+      const wp = bodyToWorld(bx, by, bz);
+      if (wp[2] < 3) { // near or at floor
+        const p = iso(wp[0], wp[1], 0);
+        RCTX.globalAlpha = 0.6;
+        RCTX.beginPath(); RCTX.arc(p[0], p[1], 3, 0, 6.2832);
+        RCTX.fillStyle = '#00aaff';
+        RCTX.fill();
+        RCTX.globalAlpha = 1;
+      }
+    }
+  }
 
   // ── all legs (back behind body, front in front) ──────────────────────────
   [3, 2].forEach(i => _drawLeg(legs[i], LEGS[i].name, true));
@@ -1274,20 +1288,18 @@ function computeCoM() {
 }
 
 // Apply gravity physics: velocity integrator for BDY.cz (no smoothing lag / no
-// Compute the minimum BDY.cz required so that no solid geometry (body corners,
-// knee joints, lower-leg midpoints, foot tips) penetrates the floor plane.
-// Uses current pitch/roll so the geometry matches what the renderer draws.
-function _czFromGeometry(pitch, roll) {
+// Collect all solid geometry sample points in body frame:
+// bottom body corners, hip mounts, knees, lower-leg samples (4 pts), and foot tips.
+// Returns array of [bx, by, bz] body-frame points.
+function _geometryPoints() {
   const {w, d, h} = BDY;
-  let czMin = h / 2; // belly floor baseline
+  const pts = [];
 
-  // Bottom 4 body corners (top corners can't go underground)
-  for (const [bx, by, bz] of [[-w/2,-d/2,-h/2],[w/2,-d/2,-h/2],[w/2,d/2,-h/2],[-w/2,d/2,-h/2]]) {
-    const v = rotX(rotY([bx, by, bz], pitch), roll);
-    czMin = Math.max(czMin, -v[2]);
-  }
+  // Bottom 4 body corners
+  for (const p of [[-w/2,-d/2,-h/2],[w/2,-d/2,-h/2],[w/2,d/2,-h/2],[-w/2,d/2,-h/2]])
+    pts.push(p);
 
-  // Per-leg: knee, lower-leg midpoint, and foot tip
+  // Per-leg geometry
   for (let i = 0; i < 4; i++) {
     const leg = LEGS[i];
     const hipA  = leg.hipFn(state.servos[leg.hs]);
@@ -1296,19 +1308,27 @@ function _czFromGeometry(pitch, roll) {
     const ud = rotZ(leg.dir0, hipA);
     const sp = Math.sin(physA), cp = Math.cos(physA);
 
-    const kbx = mx + ud[0]*leg.upp, kby = my + ud[1]*leg.upp; // knee (body-frame z = mz)
-    const fbx = kbx + ud[0]*sp*leg.low, fby = kby + ud[1]*sp*leg.low, fbz = mz - cp*leg.low; // foot
+    const kbx = mx + ud[0]*leg.upp, kby = my + ud[1]*leg.upp;
+    const fbx = kbx + ud[0]*sp*leg.low, fby = kby + ud[1]*sp*leg.low, fbz = mz - cp*leg.low;
 
-    for (const [bx, by, bz] of [
-      [kbx, kby, mz],                                          // knee
-      [(kbx+fbx)/2, (kby+fby)/2, (mz+fbz)/2],                 // lower-leg midpoint
-      [fbx, fby, fbz],                                         // foot tip
-    ]) {
-      const v = rotX(rotY([bx, by, bz], pitch), roll);
-      czMin = Math.max(czMin, -v[2]);
-    }
+    pts.push([mx, my, mz]);              // hip mount
+    pts.push([kbx, kby, mz]);           // knee
+    // 4 evenly-spaced samples along lower leg (catches angled leg segments)
+    for (let t = 0.25; t <= 1; t += 0.25)
+      pts.push([kbx+(fbx-kbx)*t, kby+(fby-kby)*t, mz+(fbz-mz)*t]);
   }
 
+  return pts;
+}
+
+// Compute the minimum BDY.cz so no solid geometry penetrates the floor.
+// Uses provided pitch/roll (pass state.pitch/roll to match renderer).
+function _czFromGeometry(pitch, roll) {
+  let czMin = BDY.h / 2;
+  for (const [bx, by, bz] of _geometryPoints()) {
+    const v = rotX(rotY([bx, by, bz], pitch), roll);
+    czMin = Math.max(czMin, -v[2]);
+  }
   return czMin;
 }
 
@@ -1317,33 +1337,51 @@ function _czFromGeometry(pitch, roll) {
 function applyGravityPose() {
   const DT   = 1 / 60;
   const GRAV = 9800;  // mm/s²
-  const DAMP = 0.20;  // velocity damping at contact
+  const DAMP = 0.20;  // velocity damping at contact (bounce fraction)
 
   const footBodies = currentFootBodies();
   const stance = detectStance(footBodies);
   const comBody = computeCoM();
 
-  // solveBodyGravity finds the minimum-cz orientation (body sinks as low as gravity
-  // allows while stance feet stay on floor). This gives correct tipping behaviour:
-  // e.g. with only back feet as stance, the body pitches forward naturally.
-  const { cz: czContact, pitch, roll } = solveBodyGravity(footBodies, stance, comBody);
+  // solveBodyGravity: finds minimum-cz orientation (body sinks as low as gravity
+  // allows while stance feet stay on floor). Correct for 3+ contacts.
+  const { cz: czContact, pitch: pitchSolved, roll: rollSolved } = solveBodyGravity(footBodies, stance, comBody);
 
-  // Geometric floor: ensures body box, knees, lower-leg midpoints and feet never
-  // penetrate. This is the hard floor that accounts for all solid geometry.
-  const czGeom = _czFromGeometry(pitch, roll);
+  // Tipping heuristic: with <3 stance feet, the contact solver is underdetermined
+  // and Tikhonov regularisation keeps pitch/roll near zero (level body). Instead,
+  // tilt toward the support centroid — this is where gravity would pull it.
+  // pitch (rotY) = left-right tilt; roll (rotX) = front-back tilt.
+  const stanceFeet = [0,1,2,3].filter(i => stance[i]);
+  let pitch = pitchSolved, roll = rollSolved;
+  if (stanceFeet.length > 0 && stanceFeet.length < 3) {
+    const cBx = stanceFeet.reduce((s, i) => s + footBodies[i][0], 0) / stanceFeet.length;
+    const cBy = stanceFeet.reduce((s, i) => s + footBodies[i][1], 0) / stanceFeet.length;
+    const h = Math.max(30, BDY.cz);
+    const tipFrac = (3 - stanceFeet.length) / 3; // 0.67 for 1 foot, 0.33 for 2 feet
+    const CAP = 0.40; // ~23° max tipping contribution
+    pitch += Math.max(-CAP, Math.min(CAP, cBx / h * 0.5 * tipFrac));
+    roll  += Math.max(-CAP, Math.min(CAP, cBy / h * 0.5 * tipFrac));
+  }
+
+  // Geometric floor using CURRENT pitch/roll so it matches what the renderer draws.
+  const czGeom  = _czFromGeometry(state.pitch, state.roll);
   const czFloor = Math.max(czContact, czGeom);
 
   // Gravity integration
   bodyVelZ -= GRAV * DT;
   BDY.cz   += bodyVelZ * DT;
 
-  // Apply the combined floor constraint
+  // Apply floor constraint. When czFloor rises suddenly (new contacts snap in, e.g.
+  // all four feet landing after pushup), stop without bounce to prevent hopping.
   if (BDY.cz < czFloor) {
+    const czFloorRise = czFloor - prevCzFloor;
     BDY.cz = czFloor;
-    if (bodyVelZ < 0) bodyVelZ *= -DAMP;
+    if (czFloorRise > 8) bodyVelZ = 0;          // new contacts: settle cleanly
+    else if (bodyVelZ < 0) bodyVelZ *= -DAMP;   // normal fall: small bounce
   }
+  prevCzFloor = czFloor;
 
-  // Smooth pitch/roll toward the gravity-solved orientation
+  // Smooth pitch/roll toward gravity-solved + tipping target
   const a = 0.28;
   state.pitch = state.pitch * (1 - a) + pitch * a;
   state.roll  = state.roll  * (1 - a) + roll  * a;
