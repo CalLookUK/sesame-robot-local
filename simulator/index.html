@@ -1273,49 +1273,38 @@ function computeCoM() {
   return [wx/MASS_TOTAL, wy/MASS_TOTAL, wz/MASS_TOTAL];
 }
 
-// Solve pitch/roll from feet that are at or near the floor (worldZ ≤ 4mm).
-// Uses body-frame foot positions (FK output) — _solveContact handles the math.
-function _solvePitchRoll(footBodies, stance) {
-  const active = [0,1,2,3].filter(i => stance[i]);
-  if (active.length < 2) return { pitch: state.pitch, roll: state.roll };
-  const [, pitch, roll] = _solveContact(footBodies, active);
-  if (Math.abs(pitch) > 0.6 || Math.abs(roll) > 0.6) return { pitch: state.pitch, roll: state.roll };
-  return { pitch, roll };
-}
-
-// Apply gravity physics using velocity integration + hard floor contact resolution.
-// Euler integration: body falls under gravity, contacts push it up, no smoothing lag.
+// Apply gravity physics: velocity integrator for BDY.cz (no smoothing lag / no
+// penetration) combined with solveBodyGravity for pitch/roll (gravity-aware tipping).
 function applyGravityPose() {
-  const DT   = 1 / 60;          // seconds per frame
-  const GRAV = 9800;             // mm/s² (earth gravity)
-  const DAMP = 0.30;             // vertical damping at contact (absorbs bounce)
+  const DT   = 1 / 60;
+  const GRAV = 9800;  // mm/s²
+  const DAMP = 0.20;  // velocity damping at contact
 
   const footBodies = currentFootBodies();
+  const stance = detectStance(footBodies);
+  const comBody = computeCoM();
 
-  // Integrate gravity
+  // solveBodyGravity finds the minimum-cz orientation (body sinks as low as gravity
+  // allows while stance feet stay on floor). This gives correct tipping behaviour:
+  // e.g. with only back feet as stance, the body pitches forward naturally.
+  const { cz: czContact, pitch, roll } = solveBodyGravity(footBodies, stance, comBody);
+
+  // Gravity integration
   bodyVelZ -= GRAV * DT;
   BDY.cz   += bodyVelZ * DT;
 
-  // Hard floor: body belly can't go underground
+  // Belly floor: body can't sink through ground on its underside
   if (BDY.cz < BDY.h / 2) { BDY.cz = BDY.h / 2; if (bodyVelZ < 0) bodyVelZ = 0; }
 
-  // Hard contact: find deepest foot penetration and push body up by that amount.
-  // Apply current pitch/roll so contact world-Z matches what the renderer draws.
-  let maxPenetration = 0;
-  for (const [bx, by, bz] of footBodies) {
-    const v = rotX(rotY([bx, by, bz], state.pitch), state.roll);
-    const worldZ = BDY.cz + v[2];
-    if (worldZ < 0) maxPenetration = Math.max(maxPenetration, -worldZ);
-  }
-  if (maxPenetration > 0) {
-    BDY.cz += maxPenetration;
-    if (bodyVelZ < 0) bodyVelZ *= -DAMP; // slight bounce damping
+  // Contact floor: czContact is the lowest valid BDY.cz given current contacts.
+  // The velocity integrator can't go below this (feet would penetrate).
+  if (BDY.cz < czContact) {
+    BDY.cz = czContact;
+    if (bodyVelZ < 0) bodyVelZ *= -DAMP;
   }
 
-  // Solve pitch/roll from grounded feet, with gentle smoothing to avoid jitter
-  const stance = detectStance(footBodies);
-  const { pitch, roll } = _solvePitchRoll(footBodies, stance);
-  const a = 0.25;
+  // Smooth pitch/roll toward the gravity-solved orientation
+  const a = 0.28;
   state.pitch = state.pitch * (1 - a) + pitch * a;
   state.roll  = state.roll  * (1 - a) + roll  * a;
 }
@@ -1439,8 +1428,9 @@ function solveBodyGravity(footBodies, stanceFlags, comBody) {
     if (czRaw < bestCz) { bestCz = czRaw; bestPitch = pitch; bestRoll = roll; bestActive = active; }
   }
 
-  // No valid contact solution — let gravity slowly pull body toward floor
-  if (bestCz === Infinity) return { cz: Math.max(BDY.h/2, BDY.cz - 1.5), pitch: 0, roll: 0, active: [] };
+  // No valid contact — body is in free fall; return belly-floor only so the
+  // velocity integrator handles descent without any snapping.
+  if (bestCz === Infinity) return { cz: BDY.h/2, pitch: 0, roll: 0, active: [] };
   return { cz: Math.max(bestCz, BDY.h/2), pitch: bestPitch, roll: bestRoll, active: bestActive };
 }
 
